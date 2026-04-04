@@ -1,5 +1,5 @@
 # ISS-Project
-## Name o Contributors:
+## Name of Contributors:
 
 1) Garvit Agrawal
 2) Pranay Mehtta
