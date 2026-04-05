@@ -12,6 +12,8 @@
 ### Steps to run code:
 <pre>
 <u>* NOTE:</u> Make sure that you are in the directory of terminal where app.py and facial_recognition_module.py resides.<br>
+<u>* NOTE:</u> Make sure that you create both `.env` files before running the codes.<br>
+
 1) <b>Terminal:</b> uv run Fetch_data/harvester.py (To fetch data from IIIT server to MySQL)
 2) <b>Terminal 2:</b> python3 -m http.server 8000
 3) <b>Terminal 1:</b> uv run app.py
@@ -74,7 +76,7 @@ MONGO_URI=mongodb://localhost:27017
     played_at           TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (player1_uid) REFERENCES users(uid),
     FOREIGN KEY (player2_uid) REFERENCES users(uid)
-);
+    );
 
 5) exit;
 </pre>
