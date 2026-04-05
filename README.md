@@ -1,17 +1,17 @@
 # ISS-Project
 ## Name of Contributors:
-
-1) Garvit Agrawal
-2) Pranay Mehtta
-3) Daksh Panchotiya
-
+<b>
+1) Garvit Agrawal<br>
+2) Pranay Mehtta<br>
+3) Daksh Panchotiya<br>
+</b>
 
 ### Steps to run code:
 <pre>
-**Make sure that you are in the directory of terminal where app.py and facial_recognition_module.py resides.**<br>
-1) **Terminal 1:** uv run app.py
-2) **Terminal 2:** python3 -m http.server 8000
-3) **In Browser:** http://localhost:8000/Frontend/HTML/login.html
+*Make sure that you are in the directory of terminal where app.py and facial_recognition_module.py resides.<br>
+1) <b>Terminal 1:</b> uv run app.py
+2) <b>Terminal 2:</b> python3 -m http.server 8000
+3) <b>In Browser:</b> http://localhost:8000/Frontend/HTML/login.html
 </pre>
 
 ### UV Add Commands:
