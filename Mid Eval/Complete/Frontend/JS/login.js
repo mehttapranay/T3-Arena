@@ -54,12 +54,14 @@ document.addEventListener('DOMContentLoaded', () => {
         .then(response => response.json())
         .then(data => {
             if(data.success) {
+                sessionStorage.setItem("arena_auth_user", data.name);
+
                 btnText.innerText = "ACCESS GRANTED";
                 statusText.innerText = `WELCOME, ${data.name.toUpperCase()}`;
                 statusText.classList.replace("text-on-surface", "text-secondary");
                 
                 setTimeout(() => {
-                    window.location.href = "Dax/frontend/htmls/lobby_command_center.html"; 
+                    window.location.href = "lobby_command_center.html";
                 }, 1500);
             } else {
                 throw new Error("Face not recognized in database.");
