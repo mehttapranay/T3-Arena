@@ -11,7 +11,7 @@
 **Make sure that you are in the directory of terminal where app.py and facial_recognition_module.py resides.**<br>
 1) **Terminal 1:** uv run app.py
 2) **Terminal 2:** python3 -m http.server 8000
-3) **In Browser:** http://localhost:8000/Frontend/htmls/login.html
+3) **In Browser:** http://localhost:8000/Frontend/HTML/login.html
 </pre>
 
 ### UV Add Commands:
