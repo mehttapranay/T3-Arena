@@ -6,20 +6,27 @@
 3) Daksh Panchotiya<br>
 </b>
 
+---
+---
+
 ### Steps to run code:
 <pre>
-*Make sure that you are in the directory of terminal where app.py and facial_recognition_module.py resides.<br>
-1) <b>Terminal 1:</b> uv run app.py
+<u>* NOTE:</u> Make sure that you are in the directory of terminal where app.py and facial_recognition_module.py resides.<br>
+1) <b>Terminal:</b> uv run Fetch_data/harvester.py (To fetch data from IIIT server to MySQL)
 2) <b>Terminal 2:</b> python3 -m http.server 8000
-3) <b>In Browser:</b> http://localhost:8000/Frontend/HTML/login.html
+3) <b>Terminal 1:</b> uv run app.py
+4) <b>In Browser:</b> http://localhost:8000/Frontend/HTML/login.html
 </pre>
+
+---
 
 ### UV Add Commands:
 1) uv add mysql-connector-python pymongo python-dotenv
 2) uv add flask flask-cors face-recognition numpy pillow "setuptools<70" requests
 
+---
 
-### .env configurations:
+### .env configurations (near `harvester.py`):
 <pre>
 DB_HOST=localhost
 DB_USER=root
@@ -27,18 +34,52 @@ DB_PASSWORD=YourMysqlPasswordHere
 DB_NAME=arena_db
 </pre>
 
-### Create Data Base:
+---
+
+### .env configurations (near `app.py`):
 <pre>
-1) CREATE DATABASE arena_db;
-2) USE arena_db;
-3) CREATE TABLE players (
-    uid VARCHAR(20) PRIMARY KEY,
-    name VARCHAR(100),
-    elo_rating INT DEFAULT 1200,
-    is_online BOOLEAN DEFAULT FALSE
-    );
-4) exit;
+DB_HOST=localhost
+DB_USER=root
+DB_PASSWORD=YourMysqlPasswordHere
+DB_NAME=arena_db
+MONGO_URI=mongodb://localhost:27017
 </pre>
+
+---
+
+### Create Data Bases:
+<pre>
+1) CREATE DATABASE IF NOT EXISTS arena_db;
+
+2) USE arena_db;
+
+3) CREATE TABLE IF NOT EXISTS users (
+    uid         VARCHAR(50)  PRIMARY KEY,
+    name        VARCHAR(255) NOT NULL,
+    elo_rating  INT          DEFAULT 1200,
+    is_online   BOOLEAN      DEFAULT FALSE,
+    is_fighting BOOLEAN      DEFAULT FALSE   -- needed for lobby "FIGHTING" status
+    );
+
+4) CREATE TABLE IF NOT EXISTS match_history (
+    id                  INT AUTO_INCREMENT PRIMARY KEY,
+    player1_uid         VARCHAR(50) NOT NULL,
+    player2_uid         VARCHAR(50) NOT NULL,
+    winner_uid          VARCHAR(50) DEFAULT NULL,   -- NULL = draw
+    player1_elo_before  INT         NOT NULL,
+    player2_elo_before  INT         NOT NULL,
+    player1_elo_after   INT         NOT NULL,
+    player2_elo_after   INT         NOT NULL,
+    forfeit             BOOLEAN     DEFAULT FALSE,
+    played_at           TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (player1_uid) REFERENCES users(uid),
+    FOREIGN KEY (player2_uid) REFERENCES users(uid)
+);
+
+5) exit;
+</pre>
+
+---
 
 ### Mac Specific Commands:
 <pre>
@@ -46,3 +87,5 @@ DB_NAME=arena_db
 2) brew services start mysql ->(then) mysql -u root -p
 3) brew tap mongodb/brew  ->(then) brew install mongodb-community  ->(then) brew services start mongodb-community
 </pre>
+
+---
