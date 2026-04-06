@@ -1,5 +1,3 @@
-// leaderboard.js
-
 document.addEventListener('DOMContentLoaded', () => {
 
     // ── Sidebar toggle ────────────────────────────────────────────────────
@@ -25,18 +23,32 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnFilterLive   = document.getElementById('btn-filter-live');
     const btnFilterGlobal = document.getElementById('btn-filter-global');
 
-    // Show logged-in user's name in sidebar
-    const loggedInUser = sessionStorage.getItem("arena_auth_user");
     const loggedInUid  = sessionStorage.getItem("arena_auth_uid");
-    const nameDisplay  = document.getElementById('operator-name-display');
-    if (nameDisplay && loggedInUser) {
-        nameDisplay.innerText = loggedInUser.replaceAll('_', ' ').toUpperCase();
+    const loggedInUser = sessionStorage.getItem("arena_auth_user");
+    const sidebarNameDisplay = document.getElementById('operator-name-display');
+    const sidebarEloDisplay  = document.getElementById('operator-elo-display');
+    const headerInitialsDisplay = document.getElementById('header-initials-display');
+
+    if (sidebarNameDisplay && loggedInUser) {
+        sidebarNameDisplay.innerText = loggedInUser.replaceAll('_', ' ').toUpperCase();
     }
 
     const PLAYERS_PER_PAGE = 10;
     let currentPage   = 1;
     let currentFilter = 'global';
     let globalLeaderboardData = [];
+
+    // ── INITIALS GENERATOR ────────────────────────────────────────────────
+    function getInitials(name) {
+        if (!name) return "??";
+        const parts = name.trim().split(/[_\s]+/);
+        if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+        return name.substring(0, 2).toUpperCase();
+    }
+
+    if (headerInitialsDisplay && loggedInUser) {
+        headerInitialsDisplay.innerText = getInitials(loggedInUser);
+    }
 
     // ── Filter button classes ─────────────────────────────────────────────
     const activeClass   = "px-4 py-2 bg-primary text-[#002e6a] text-xs font-headline font-bold tracking-widest uppercase rounded shadow-[0_0_15px_rgba(173,198,255,0.2)] transition-colors";
@@ -58,9 +70,19 @@ document.addEventListener('DOMContentLoaded', () => {
         renderTable();
     });
 
+    // ── SIDEBAR SYNC LOGIC ────────────────────────────────────────────────
+    function updateSidebarWithUserData() {
+        if (!loggedInUid) return;
+        const myData = globalLeaderboardData.find(p => p.uid === loggedInUid);
+        
+        if (myData) {
+            if (sidebarNameDisplay) sidebarNameDisplay.innerText = myData.name.replaceAll('_', ' ').toUpperCase();
+            if (sidebarEloDisplay) sidebarEloDisplay.innerText = `${myData.elo_rating} ELO`;
+        }
+    }
+
     // ── Fetch from backend ────────────────────────────────────────────────
     function fetchLeaderboard() {
-        // FIX: point to the real backend endpoint on port 5001
         fetch('http://localhost:5001/api/leaderboard', { credentials: 'include' })
             .then(res => {
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -68,7 +90,8 @@ document.addEventListener('DOMContentLoaded', () => {
             })
             .then(data => {
                 globalLeaderboardData = data.players || [];
-                renderPodium(globalLeaderboardData);
+                updateSidebarWithUserData();
+                // Notice we removed renderPodium from here! It is now handled inside renderTable()
                 renderTable();
             })
             .catch(err => {
@@ -86,6 +109,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 p.status === 'online' || p.status === 'fighting'
             );
         }
+
+        // Dynamically update the top 3 podium to match the currently filtered data!
+        renderPodium(filtered);
 
         const total      = filtered.length;
         const totalPages = Math.max(1, Math.ceil(total / PLAYERS_PER_PAGE));
@@ -124,7 +150,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 ? "bg-primary/5 border-l-4 border-primary hover:bg-primary/10 transition-colors"
                 : "hover:bg-surface-bright/20 transition-colors";
             const rankColor = player.rank <= 3 ? "text-primary" : "text-on-surface-variant";
-            const initials  = player.name.substring(0, 2).toUpperCase();
+            
+            const initials  = getInitials(player.name);
 
             leaderboardBody.insertAdjacentHTML('beforeend', `
                 <tr class="${rowClass}" id="status-cell-${player.uid}">
@@ -167,13 +194,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (currentPage > 1) { currentPage--; renderTable(); }
     });
 
-    // Initial load + refresh every 10 seconds
     fetchLeaderboard();
     setInterval(fetchLeaderboard, 10000);
 });
 
 
-// ── Podium renderer (top 3 from real data) ────────────────────────────────
+// ── Podium renderer ────────────────────────────────────────────────────────
 function renderPodium(players) {
     const podium = document.getElementById('podium');
     if (!podium) return;
@@ -184,22 +210,14 @@ function renderPodium(players) {
         return;
     }
 
-    // order: 2nd | 1st | 3rd  (podium layout)
-    const order = [top3[1], top3[0], top3[2]].filter(Boolean);
     const configs = [
         { pos: "02", border: "border-slate-400/30", numColor: "text-slate-400/10", eloColor: "text-slate-300", rankBadgeColor: "text-[#ffeb3b]", scale: "" },
         { pos: "01", border: "border-primary/50",   numColor: "text-primary/10",   eloColor: "text-primary",   rankBadgeColor: "text-[#ffeb3b]", scale: "md:scale-105 z-10" },
         { pos: "03", border: "border-amber-700/30", numColor: "text-amber-700/10", eloColor: "text-amber-500", rankBadgeColor: "text-[#e040fb]", scale: "" },
     ];
 
-    // map player index back to display order
-    const displayOrder = top3.length >= 2
-        ? [top3[1] ? 1 : null, 0, top3[2] ? 2 : null].filter(i => i !== null)
-        : [0];
-
     podium.innerHTML = '';
 
-    // always render: 2nd (order-2), 1st (order-1), 3rd (order-3) if they exist
     const slots = [
         { player: top3[1], cfg: configs[0], order: "order-2 md:order-1" },
         { player: top3[0], cfg: configs[1], order: "order-1 md:order-2" },
@@ -208,20 +226,30 @@ function renderPodium(players) {
 
     slots.forEach(({ player, cfg, order: ord }) => {
         if (!player) return;
+        
+        const parts = player.name.trim().split(/[_\s]+/);
+        let initials = "";
+        if (parts.length >= 2) initials = (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+        else initials = player.name.substring(0, 2).toUpperCase();
+
         podium.insertAdjacentHTML('beforeend', `
-            <div class="${ord} bg-surface-container-low ${cfg.border} border-b-2 p-6 rounded-lg relative overflow-hidden shadow-[0_10px_30px_rgba(0,0,0,0.3)] ${cfg.scale}">
-                <div class="absolute -right-4 -top-4 ${cfg.numColor} text-8xl font-black font-headline italic">${cfg.pos}</div>
-                <div class="flex items-center gap-4 mb-4">
-                    <div class="w-16 h-16 rounded-full border-2 border-outline-variant bg-surface-container flex items-center justify-center">
-                        <span class="material-symbols-outlined text-3xl text-on-surface-variant/60">person</span>
-                    </div>
-                    <div>
-                        <span class="text-[10px] font-headline font-bold ${cfg.rankBadgeColor} tracking-[0.3em] uppercase mb-1 block">${player.rank <= 1 ? 'World_Apex' : 'Grandmaster'}</span>
-                        <h3 class="text-xl font-black font-headline text-on-surface">${player.name}</h3>
-                        <p class="text-[10px] text-on-surface-variant/40 font-label tracking-widest">${player.uid}</p>
+            <div class="${ord} bg-surface-container-low ${cfg.border} border-b-2 p-6 rounded-lg relative overflow-hidden shadow-[0_10px_30px_rgba(0,0,0,0.3)] ${cfg.scale} flex flex-col h-full">
+                
+                <div class="flex-1">
+                    <div class="absolute -right-4 -top-4 ${cfg.numColor} text-8xl font-black font-headline italic">${cfg.pos}</div>
+                    <div class="flex items-center gap-4 mb-4">
+                        <div class="w-16 h-16 rounded-full border-2 border-outline-variant bg-surface-container flex items-center justify-center shrink-0">
+                            <span class="font-headline font-bold text-xl text-on-surface-variant">${initials}</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] font-headline font-bold ${cfg.rankBadgeColor} tracking-[0.3em] uppercase mb-1 block">${player.rank <= 1 ? 'World_Apex' : 'Grandmaster'}</span>
+                            <h3 class="text-xl font-black font-headline text-on-surface">${player.name}</h3>
+                            <p class="text-[10px] text-on-surface-variant/40 font-label tracking-widest">${player.uid}</p>
+                        </div>
                     </div>
                 </div>
-                <div class="flex justify-between items-end">
+                
+                <div class="flex justify-between items-end mt-auto pt-4">
                     <div>
                         <p class="text-[10px] text-on-surface-variant font-mono-data">ELO_RATING</p>
                         <p class="text-2xl font-black font-headline ${cfg.eloColor} tracking-tighter">${player.elo_rating.toLocaleString()}</p>
@@ -231,6 +259,7 @@ function renderPodium(players) {
                         <p class="text-lg font-bold font-mono-data text-on-surface">${player.winrate}%</p>
                     </div>
                 </div>
+
             </div>
         `);
     });

@@ -41,7 +41,6 @@
 </head>
 <body class="bg-[#131313] text-[#e5e2e1] selection:bg-[#adc6ff]/30 overflow-x-hidden">
 
-<!-- ── Header ──────────────────────────────────────────────────────────────── -->
 <header class="fixed top-0 w-full z-50 bg-[#131313]/60 backdrop-blur-xl flex justify-between items-center px-6 h-16 shadow-[0_0_20px_rgba(59,130,246,0.12)] border-b border-outline-variant/10">
     <div class="flex items-center gap-4 md:gap-8">
         <button id="sidebar-toggle" class="text-on-surface hover:text-primary transition-colors flex items-center justify-center">
@@ -50,27 +49,24 @@
         <span class="text-xl font-black italic text-[#ADC6FF] font-headline tracking-tighter hidden sm:block">ARENA_OS</span>
     </div>
     
-    <div class="flex items-center gap-6">
-        <div class="flex items-center gap-3">
-            <span class="material-symbols-outlined text-primary">account_balance_wallet</span>
-            <div class="flex flex-col items-end">
-                <!-- FIX: dynamic ELO from sessionStorage -->
-                <span id="header-elo-display" class="font-label font-bold text-primary tracking-tighter leading-tight text-sm">— ELO</span>
-                <span id="header-rank-display" class="font-label text-[10px] tracking-widest text-[#b0bec5] font-bold">—</span>
+    <div class="flex items-center gap-4 md:gap-6">
+        <div class="flex flex-col items-end">
+            <span id="header-elo-display" class="font-label font-bold text-primary tracking-tighter leading-tight text-sm">— ELO</span>
+            <span id="header-rank-display" class="font-label text-[10px] tracking-widest text-[#b0bec5] font-bold">—</span>
+        </div>
+        <div class="border-l border-outline-variant/20 pl-4 md:pl-6 flex items-center">
+            <div class="w-8 h-8 rounded-full border border-outline-variant bg-[#201f1f] flex items-center justify-center overflow-hidden cursor-pointer hover:border-primary/50 transition-colors">
+                <span id="header-initials-display" class="font-headline font-bold text-xs text-on-surface-variant">??</span>
             </div>
-            <span class="material-symbols-outlined text-on-surface-variant hover:text-primary cursor-pointer transition-colors ml-2">notifications</span>
         </div>
     </div>
 </header>
 
-<!-- ── Sidebar ──────────────────────────────────────────────────────────────── -->
 <aside id="sidebar" class="fixed left-0 top-0 h-full w-64 z-40 bg-[#1C1B1B] border-r border-[#353534]/15 flex flex-col py-8 gap-4 pt-20 transform -translate-x-full md:translate-x-0 transition-transform duration-300">
     <div class="px-6 mb-4 flex items-center gap-3">
         <div class="w-1.5 h-8 bg-primary"></div>
         <div>
-            <!-- FIX: id added so JS can inject the real logged-in name -->
             <p class="font-label text-sm uppercase tracking-widest text-[#ADC6FF]" id="operator-name-display">OPERATOR</p>
-            <!-- FIX: id added so JS can inject real ELO -->
             <p class="font-label text-[10px] uppercase tracking-widest text-primary/60 mt-0.5" id="operator-elo-display">— ELO</p>
             <div class="flex items-center gap-1.5 mt-1">
                 <span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
@@ -82,14 +78,12 @@
         <a class="px-6 py-4 flex items-center gap-4 text-[#E5E2E1]/60 hover:text-[#ADC6FF] hover:bg-[#201F1F] font-label text-sm uppercase tracking-widest transition-all duration-300" href="lobby_command_center.html">
             <span class="material-symbols-outlined">terminal</span> Command Center
         </a>
-        <!-- Active page: Leaderboard -->
         <a class="px-6 py-4 flex items-center gap-4 text-[#ADC6FF] border-l-2 border-[#ADC6FF] bg-[#201F1F] font-label text-sm uppercase tracking-widest transition-all duration-300" href="leaderboard.html">
             <span class="material-symbols-outlined">leaderboard</span> Leaderboard
         </a>
         <a class="px-6 py-4 flex items-center gap-4 text-[#E5E2E1]/60 hover:text-[#ADC6FF] hover:bg-[#201F1F] font-label text-sm uppercase tracking-widest transition-all duration-300" href="#">
             <span class="material-symbols-outlined">swords</span> Matchmaking
         </a>
-        <!-- FIX: logout calls /logout on backend first -->
         <a class="px-6 py-4 flex items-center gap-4 text-[#ffb4ab]/70 hover:text-[#ffb4ab] hover:bg-[#ffb4ab]/10 font-label text-sm uppercase tracking-widest transition-all duration-300"
            href="#" onclick="handleLogout(event)">
             <span class="material-symbols-outlined">logout</span> Disconnect
@@ -97,17 +91,14 @@
     </nav>
 </aside>
 
-<!-- ── Main ─────────────────────────────────────────────────────────────────── -->
 <main id="main-canvas" class="pt-24 pb-24 md:pl-72 md:pr-8 px-4 min-h-screen transition-all duration-300">
     <div class="max-w-6xl mx-auto">
         
-        <!-- Page Header -->
         <div class="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
             <div>
                 <h1 class="text-4xl md:text-5xl font-black font-headline tracking-tighter text-on-surface mb-2">GLOBAL_RANKINGS</h1>
                 <p class="text-on-surface-variant/70 font-mono-data text-sm flex items-center gap-2">
                     <span class="w-2 h-2 rounded-full bg-secondary animate-pulse"></span>
-                    <!-- FIX: removed hardcoded "14,029 OPERATORS ONLINE" -->
                     LIVE_SYSTEM_SYNC
                 </p>
             </div>
@@ -117,15 +108,12 @@
             </div>
         </div>
 
-        <!-- Top 3 Podium — dynamically filled by leaderboard.js -->
         <div id="podium" class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-            <!-- Podium cards injected by JS — shown as loading state initially -->
             <div class="col-span-full text-center py-8 text-on-surface-variant/40 font-label tracking-widest text-sm animate-pulse">
                 LOADING RANKINGS...
             </div>
         </div>
 
-        <!-- Full Table -->
         <div class="bg-surface-container-low rounded-lg overflow-hidden border border-outline-variant/10 shadow-2xl">
             <div class="overflow-x-auto">
                 <table class="w-full text-left border-collapse">
@@ -139,13 +127,11 @@
                         </tr>
                     </thead>
                     <tbody id="leaderboard-body" class="divide-y divide-outline-variant/5">
-                        <!-- rows injected by leaderboard.js -->
                     </tbody>
                 </table>
             </div>
         </div>
         
-        <!-- Pagination -->
         <div class="mt-6 flex flex-col md:flex-row justify-between items-center gap-4 py-4 px-6 bg-surface-container-low rounded-lg border border-outline-variant/10">
             <p id="pagination-info" class="text-[10px] font-mono-data text-on-surface-variant/60 uppercase tracking-widest">Showing 0 of 0 active records</p>
             <div class="flex items-center gap-2">
@@ -162,7 +148,6 @@
     </div>
 </main>
 
-<!-- Mobile bottom nav -->
 <nav class="lg:hidden fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-4 pt-2 bg-[#131313]/80 backdrop-blur-2xl border-t border-[#353534]/20 z-50">
     <a class="flex flex-col items-center justify-center text-[#E5E2E1]/40 hover:text-[#ADC6FF] transition-all" href="lobby_command_center.html">
         <span class="material-symbols-outlined">sports_esports</span>
@@ -175,7 +160,6 @@
 </nav>
 
 <script>
-    // ── Header ELO / rank from sessionStorage ─────────────────────────────
     function getRankName(elo) {
         if (elo >= 2800) return "GRANDMASTER";
         if (elo >= 2666) return "MASTER III";

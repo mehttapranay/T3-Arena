@@ -1,36 +1,7 @@
-// lobby_command_center.js
-
 document.addEventListener('DOMContentLoaded', () => {
 
     // ==========================================
-    // 1. AUTH GUARD & NAME TAG
-    // ==========================================
-    const loggedInUser = sessionStorage.getItem("arena_auth_user");
-    const loggedInUid  = sessionStorage.getItem("arena_auth_uid");
-    const loggedInElo  = sessionStorage.getItem("arena_auth_elo");
-
-    if (!loggedInUser) {
-        console.warn("SECURITY: Unauthorised access. Redirecting.");
-        window.location.replace("login.html");
-        return;
-    }
-
-    // FIX: target the element by ID and set real name
-    const nameDisplay = document.getElementById('operator-name-display');
-    if (nameDisplay) {
-        // FIX: replaceAll (not replace) so all underscores are replaced
-        nameDisplay.innerText = loggedInUser.replaceAll('_', ' ').toUpperCase();
-    }
-
-    // Show ELO in sidebar if element exists
-    const eloDisplay = document.getElementById('operator-elo-display');
-    if (eloDisplay && loggedInElo) {
-        eloDisplay.innerText = `${parseInt(loggedInElo).toLocaleString()} ELO`;
-    }
-
-
-    // ==========================================
-    // 2. UI ELEMENTS & STATE
+    // 1. UI ELEMENTS & STATE
     // ==========================================
     const searchInput  = document.getElementById('player-search');
     const sortSelect   = document.getElementById('sort-select');
@@ -40,9 +11,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const sidebar      = document.getElementById('sidebar');
     const sidebarToggle= document.getElementById('sidebar-toggle');
     const mainCanvas   = document.getElementById('main-canvas');
+    const onlineCountDisplay = document.getElementById('online-count');
+    
+    const sidebarNameDisplay = document.getElementById('operator-name-display');
+    const sidebarEloDisplay  = document.getElementById('operator-elo-display');
+    const headerInitialsDisplay = document.getElementById('header-initials-display');
 
     let activeFilter   = 'all';
     let isMatchRunning = false;
+    const loggedInUid  = sessionStorage.getItem("arena_auth_uid");
+    const loggedInUser = sessionStorage.getItem("arena_auth_user");
 
     sidebarToggle.addEventListener('click', () => {
         if (isMatchRunning) {
@@ -57,14 +35,38 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // ==========================================
+    // 2. INITIALS GENERATOR
+    // ==========================================
+    function getInitials(name) {
+        if (!name) return "??";
+        const parts = name.trim().split(/[_\s]+/);
+        if (parts.length >= 2) {
+            return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+        }
+        return name.substring(0, 2).toUpperCase();
+    }
+
+    if (headerInitialsDisplay && loggedInUser) {
+        headerInitialsDisplay.innerText = getInitials(loggedInUser);
+    }
 
     // ==========================================
-    // 3. BACKEND INTEGRATION
+    // 3. BACKEND INTEGRATION & SIDEBAR SYNC
     // ==========================================
     let globalPlayersData = [];
 
+    function updateSidebarWithUserData() {
+        if (!loggedInUid) return;
+        const myData = globalPlayersData.find(p => p.uid === loggedInUid);
+        
+        if (myData) {
+            if (sidebarNameDisplay) sidebarNameDisplay.innerText = myData.name.replaceAll('_', ' ').toUpperCase();
+            if (sidebarEloDisplay) sidebarEloDisplay.innerText = `${myData.elo_rating} ELO`;
+        }
+    }
+
     function fetchPlayers() {
-        // FIX: this endpoint now exists in app.py
         fetch('http://localhost:5001/api/players', { credentials: 'include' })
             .then(response => {
                 if (!response.ok) throw new Error(`Server error: ${response.status}`);
@@ -72,6 +74,7 @@ document.addEventListener('DOMContentLoaded', () => {
             })
             .then(data => {
                 globalPlayersData = data.players || [];
+                updateSidebarWithUserData(); 
                 renderGrid();
             })
             .catch(error => {
@@ -80,7 +83,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 renderGrid();
             });
     }
-
 
     // ==========================================
     // 4. ELO → RANK
@@ -107,7 +109,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return                  { name: "BRONZE I",     color: "text-[#cd7f32]" };
     }
 
-
     // ==========================================
     // 5. FILTERS
     // ==========================================
@@ -129,9 +130,8 @@ document.addEventListener('DOMContentLoaded', () => {
         renderGrid();
     });
 
-
     // ==========================================
-    // 6. RENDER GRID
+    // 6. RENDER GRID & GROUPED SORTING
     // ==========================================
     function renderGrid() {
         const searchTerm = searchInput.value.toLowerCase();
@@ -144,8 +144,29 @@ document.addEventListener('DOMContentLoaded', () => {
             filtered = filtered.filter(p => p.elo_rating >= 2800);
         }
 
+        if (onlineCountDisplay) {
+            const onlineCount = globalPlayersData.filter(p => p.status === 'online' || p.status === 'fighting').length;
+            onlineCountDisplay.innerText = `${onlineCount} ONLINE`;
+        }
+
+        const statusWeight = { "online": 1, "fighting": 2, "offline": 3 };
         const sortMode = sortSelect.value;
+        
         filtered.sort((a, b) => {
+            // 1. Absolute Priority: Force the Logged In User to the top!
+            const isMeA = a.uid === loggedInUid;
+            const isMeB = b.uid === loggedInUid;
+            if (isMeA && !isMeB) return -1;
+            if (!isMeA && isMeB) return 1;
+
+            // 2. Next Priority: Online -> Fighting -> Offline
+            const weightA = statusWeight[a.status] || 3;
+            const weightB = statusWeight[b.status] || 3;
+            if (weightA !== weightB) {
+                return weightA - weightB; 
+            }
+
+            // 3. Final Priority: The dropdown sorting
             switch (sortMode) {
                 case 'elo-desc':  return b.elo_rating - a.elo_rating;
                 case 'elo-asc':   return a.elo_rating - b.elo_rating;
@@ -171,8 +192,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         filtered.forEach(player => {
             const rankData = getRank(player.elo_rating);
-            // FIX: check if this card is the currently logged-in user
             const isMe = player.uid === loggedInUid;
+            const initials = getInitials(player.name);
 
             let statusClass = "";
             let buttonState = "";
@@ -188,7 +209,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
             } else if (player.status === "online") {
                 if (isMe) {
-                    // It's the logged-in user — show YOU badge, no challenge button
                     statusClass = "bg-[#1c1b1b] border-primary/30";
                     statusBadge = `<p class="font-label text-[10px] text-primary uppercase tracking-widest flex items-center gap-1.5">
                         <span class="w-1.5 h-1.5 rounded-full bg-primary"></span>YOU — ONLINE
@@ -211,23 +231,30 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             playerGrid.insertAdjacentHTML('beforeend', `
-                <div class="player-card group relative ${statusClass} border border-outline-variant/10 p-5 rounded-lg transition-all duration-300 hover:shadow-[0_0_20px_rgba(173,198,255,0.05)] ${isMe ? 'ring-1 ring-primary/30' : ''}">
-                    <div class="flex items-start justify-between mb-6">
-                        <div class="w-16 h-16 rounded-full border-2 border-outline-variant bg-[#353534] flex items-center justify-center overflow-hidden">
-                            <span class="material-symbols-outlined text-3xl text-primary/40">person</span>
+                <div class="player-card group relative ${statusClass} border border-outline-variant/10 p-5 rounded-lg transition-all duration-300 hover:shadow-[0_0_20px_rgba(173,198,255,0.05)] ${isMe ? 'ring-1 ring-primary/30' : ''} flex flex-col h-full">
+                    
+                    <div class="flex-1">
+                        <div class="flex items-start justify-between mb-6 gap-2">
+                            <div class="w-16 h-16 shrink-0 rounded-full border-2 border-outline-variant bg-[#201f1f] flex items-center justify-center overflow-hidden">
+                                <span class="font-headline font-bold text-xl text-on-surface-variant">${initials}</span>
+                            </div>
+                            <div class="text-right">
+                                <p class="font-label text-[10px] ${rankData.color} uppercase tracking-widest font-bold">${rankData.name}</p>
+                                <p class="font-headline font-black text-xl text-primary tracking-tighter">${player.elo_rating} ELO</p>
+                                <p class="font-label text-[10px] text-primary/60 tracking-widest">WR: ${player.winrate}%</p>
+                            </div>
                         </div>
-                        <div class="text-right">
-                            <p class="font-label text-[10px] ${rankData.color} uppercase tracking-widest font-bold">${rankData.name}</p>
-                            <p class="font-headline font-black text-xl text-primary tracking-tighter">${player.elo_rating} ELO</p>
-                            <p class="font-label text-[10px] text-primary/60 tracking-widest">WR: ${player.winrate}%</p>
+                        <div>
+                            <h3 class="font-headline text-lg font-bold text-on-surface group-hover:text-primary transition-colors">${player.name}</h3>
+                            <p class="font-label text-[10px] text-on-surface-variant/40 tracking-widest mb-1">${player.uid}</p>
+                            <div class="mb-4 mt-1">${statusBadge}</div>
                         </div>
                     </div>
-                    <div>
-                        <h3 class="font-headline text-lg font-bold text-on-surface group-hover:text-primary transition-colors">${player.name}</h3>
-                        <p class="font-label text-[10px] text-on-surface-variant/40 tracking-widest mb-1">${player.uid}</p>
-                        <div class="mb-4 mt-1">${statusBadge}</div>
+                    
+                    <div class="mt-auto w-full">
+                        ${buttonState}
                     </div>
-                    ${buttonState}
+
                 </div>
             `);
         });
@@ -236,7 +263,6 @@ document.addEventListener('DOMContentLoaded', () => {
     searchInput.addEventListener('input', renderGrid);
     sortSelect.addEventListener('change', renderGrid);
 
-    // Initial fetch + refresh every 5 seconds
     fetchPlayers();
     setInterval(fetchPlayers, 5000);
 });
