@@ -1,7 +1,21 @@
+// lobby_command_center.js
+
 document.addEventListener('DOMContentLoaded', () => {
 
     // ==========================================
-    // 1. UI ELEMENTS & STATE
+    // 1. AUTH GUARD
+    // ==========================================
+    const loggedInUser = sessionStorage.getItem("arena_auth_user");
+    const loggedInUid  = sessionStorage.getItem("arena_auth_uid");
+
+    if (!loggedInUser || !loggedInUid) {
+        console.warn("SECURITY: Unauthorised access. Redirecting.");
+        window.location.replace("login.html");
+        return;
+    }
+
+    // ==========================================
+    // 2. UI ELEMENTS & STATE
     // ==========================================
     const searchInput  = document.getElementById('player-search');
     const sortSelect   = document.getElementById('sort-select');
@@ -19,8 +33,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let activeFilter   = 'all';
     let isMatchRunning = false;
-    const loggedInUid  = sessionStorage.getItem("arena_auth_uid");
-    const loggedInUser = sessionStorage.getItem("arena_auth_user");
 
     sidebarToggle.addEventListener('click', () => {
         if (isMatchRunning) {
@@ -36,7 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // ==========================================
-    // 2. INITIALS GENERATOR
+    // 3. INITIALS GENERATOR
     // ==========================================
     function getInitials(name) {
         if (!name) return "??";
@@ -52,7 +64,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ==========================================
-    // 3. BACKEND INTEGRATION & SIDEBAR SYNC
+    // 4. BACKEND INTEGRATION & SIDEBAR SYNC
     // ==========================================
     let globalPlayersData = [];
 
@@ -85,7 +97,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ==========================================
-    // 4. ELO → RANK
+    // 5. ELO → RANK
     // ==========================================
     function getRank(elo) {
         if (elo >= 2800) return { name: "GRANDMASTER",  color: "text-[#ffeb3b]" };
@@ -110,7 +122,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ==========================================
-    // 5. FILTERS
+    // 6. FILTERS
     // ==========================================
     btnFilterAll.addEventListener('click', () => {
         activeFilter = 'all';
@@ -131,7 +143,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // ==========================================
-    // 6. RENDER GRID & GROUPED SORTING
+    // 7. RENDER GRID & GROUPED SORTING
     // ==========================================
     function renderGrid() {
         const searchTerm = searchInput.value.toLowerCase();
@@ -153,20 +165,20 @@ document.addEventListener('DOMContentLoaded', () => {
         const sortMode = sortSelect.value;
         
         filtered.sort((a, b) => {
-            // 1. Absolute Priority: Force the Logged In User to the top!
+            // Absolute Priority: Force the Logged In User to the top!
             const isMeA = a.uid === loggedInUid;
             const isMeB = b.uid === loggedInUid;
             if (isMeA && !isMeB) return -1;
             if (!isMeA && isMeB) return 1;
 
-            // 2. Next Priority: Online -> Fighting -> Offline
+            // Next Priority: Online -> Fighting -> Offline
             const weightA = statusWeight[a.status] || 3;
             const weightB = statusWeight[b.status] || 3;
             if (weightA !== weightB) {
                 return weightA - weightB; 
             }
 
-            // 3. Final Priority: The dropdown sorting
+            // Final Priority: The dropdown sorting
             switch (sortMode) {
                 case 'elo-desc':  return b.elo_rating - a.elo_rating;
                 case 'elo-asc':   return a.elo_rating - b.elo_rating;
@@ -265,4 +277,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
     fetchPlayers();
     setInterval(fetchPlayers, 5000);
+});
+
+// ==========================================
+// 8. GHOST USER PREVENTION: Smart Tab Close Detector
+// ==========================================
+let isNavigating = false;
+
+document.addEventListener('click', (e) => {
+    const link = e.target.closest('a');
+    if (link) {
+        isNavigating = true; 
+    }
+});
+
+window.addEventListener('beforeunload', () => {
+    if (isNavigating) return; 
+
+    const myUid = sessionStorage.getItem("arena_auth_uid");
+    
+    if (myUid) {
+        fetch('http://localhost:5001/logout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ uid: myUid }),
+            keepalive: true 
+        }).catch(() => {}); 
+    }
 });
