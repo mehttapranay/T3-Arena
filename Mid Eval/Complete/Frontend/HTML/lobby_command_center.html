@@ -1,202 +1,155 @@
 <!DOCTYPE html>
-<html class="dark" lang="en">
+<html lang="en">
 <head>
     <meta charset="utf-8"/>
     <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
     <title>ARENA_OS | Lobby</title>
-    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@300;400;500;600;700;900&display=swap" rel="stylesheet"/>
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
     
     <link rel="stylesheet" href="../CSS/lobby_command_center.css">
     <script src="../JS/lobby_command_center.js" defer></script>
-
-    <script id="tailwind-config">
-        tailwind.config = {
-            darkMode: "class",
-            theme: {
-                extend: {
-                    colors: {
-                        "surface-dim": "#131313",
-                        "surface-container-highest": "#353534",
-                        "on-surface": "#e5e2e1",
-                        "primary": "#adc6ff",
-                        "secondary": "#4edea3",
-                        "surface-container-low": "#1c1b1b",
-                        "on-surface-variant": "#c2c6d6",
-                        "surface-container": "#201f1f",
-                        "outline-variant": "#424754",
-                        "surface-bright": "#393939"
-                    },
-                    fontFamily: {
-                        "headline": ["Space Grotesk"],
-                        "body": ["Inter"],
-                        "label": ["Space Grotesk"]
-                    }
-                },
-            },
-        }
-    </script>
 </head>
-<body class="bg-[#131313] text-[#e5e2e1] selection:bg-[#adc6ff]/30">
+<body>
 
-<header class="fixed top-0 w-full z-50 bg-[#131313]/60 backdrop-blur-xl flex justify-between items-center px-6 h-16 shadow-[0_0_20px_rgba(59,130,246,0.12)]">
-    <div class="flex items-center gap-4 md:gap-8">
-        <button id="sidebar-toggle" class="text-on-surface hover:text-primary transition-colors flex items-center justify-center">
+<header class="top-navbar">
+    <div class="nav-left">
+        <button id="sidebar-toggle" class="menu-btn">
             <span class="material-symbols-outlined">menu</span>
         </button>
-        <span class="text-xl font-black italic text-[#ADC6FF] font-headline tracking-tighter hidden sm:block">ARENA_OS</span>
+        <span class="brand-text font-headline">ARENA_OS</span>
         
-        <div class="hidden md:flex items-center bg-surface-container-highest/30 px-3 py-1.5 rounded-lg border border-outline-variant/10 focus-within:border-[#adc6ff]/50 transition-colors">
-            <span class="material-symbols-outlined text-on-surface-variant text-sm mr-2">search</span>
-            <input id="player-search" class="bg-transparent border-none focus:ring-0 text-sm font-label uppercase tracking-widest p-0 w-48 placeholder:text-on-surface-variant/40 outline-none text-[#e5e2e1]" placeholder="LOCATE_PLAYER..." type="text"/>
+        <div class="search-box">
+            <span class="material-symbols-outlined">search</span>
+            <input id="player-search" class="search-input font-label" placeholder="LOCATE_PLAYER..." type="text"/>
         </div>
     </div>
 
-    <div class="flex items-center gap-4 md:gap-6">
-        <div class="flex flex-col items-end">
-            <span id="header-elo-display" class="font-label font-bold text-primary tracking-tighter leading-tight text-sm">— ELO</span>
-            <span id="header-rank-display" class="font-label text-[10px] tracking-widest text-[#b0bec5] font-bold">—</span>
+    <div class="nav-right">
+        <div class="user-quick-stats font-label">
+            <span id="header-elo-display" class="stat-elo">— ELO</span>
+            <span id="header-rank-display" class="stat-rank">—</span>
         </div>
-        <div class="border-l border-outline-variant/20 pl-4 md:pl-6 flex items-center">
-            <div class="w-8 h-8 rounded-full border border-outline-variant bg-[#201f1f] flex items-center justify-center overflow-hidden cursor-pointer hover:border-primary/50 transition-colors">
-                <span id="header-initials-display" class="font-headline font-bold text-xs text-on-surface-variant">??</span>
-            </div>
+        <div class="profile-avatar font-headline">
+            <span id="header-initials-display">??</span>
         </div>
     </div>
 </header>
 
-<aside id="sidebar" class="fixed left-0 top-0 h-full w-64 z-40 bg-[#1C1B1B] border-r border-[#353534]/15 flex flex-col py-8 gap-4 pt-20 transform -translate-x-full md:translate-x-0 transition-transform duration-300">
-    <div class="px-6 mb-4 flex items-center gap-3">
-        <div class="w-1.5 h-8 bg-primary"></div>
-        <div>
-            <p class="font-label text-sm uppercase tracking-widest text-[#ADC6FF]" id="operator-name-display">OPERATOR</p>
-            <p class="font-label text-[10px] uppercase tracking-widest text-primary/60 mt-0.5" id="operator-elo-display">— ELO</p>
-            <div class="flex items-center gap-1.5 mt-1">
-                <span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
-                <p class="font-label text-[10px] uppercase tracking-widest text-secondary">STATUS: ONLINE</p>
-            </div>
+<aside id="sidebar" class="sidebar">
+    <div class="sidebar-profile">
+        <div class="sidebar-indicator"></div>
+        <div class="font-label">
+            <p id="operator-name-display" class="sidebar-profile-name">OPERATOR</p>
+            <p id="operator-elo-display" class="sidebar-profile-elo">— ELO</p>
         </div>
     </div>
-    <nav class="flex flex-col">
-        <a class="px-6 py-4 flex items-center gap-4 text-[#ADC6FF] border-l-2 border-[#ADC6FF] bg-[#201F1F] font-label text-sm uppercase tracking-widest transition-all duration-300" href="lobby_command_center.html">
+    
+    <nav class="nav-links font-label">
+        <a class="nav-link active" href="lobby_command_center.html">
             <span class="material-symbols-outlined">terminal</span> Command Center
         </a>
-        <a class="px-6 py-4 flex items-center gap-4 text-[#E5E2E1]/60 hover:text-[#ADC6FF] hover:bg-[#201F1F] font-label text-sm uppercase tracking-widest transition-all duration-300" href="leaderboard.html">
+        <a class="nav-link" href="leaderboard.html">
             <span class="material-symbols-outlined">leaderboard</span> Leaderboard
         </a>
-        <a class="px-6 py-4 flex items-center gap-4 text-[#E5E2E1]/60 hover:text-[#ADC6FF] hover:bg-[#201F1F] font-label text-sm uppercase tracking-widest transition-all duration-300" href="#">
+        <a class="nav-link" href="#">
             <span class="material-symbols-outlined">swords</span> Matchmaking
         </a>
-        <a class="px-6 py-4 flex items-center gap-4 text-[#ffb4ab]/70 hover:text-[#ffb4ab] hover:bg-[#ffb4ab]/10 font-label text-sm uppercase tracking-widest transition-all duration-300"
-           href="#" onclick="handleLogout(event)">
+        <a id="btn-logout" class="nav-link danger">
             <span class="material-symbols-outlined">logout</span> Disconnect
         </a>
     </nav>
 </aside>
 
-<main id="main-canvas" class="pt-24 pb-24 px-6 min-h-screen transition-all duration-300 md:ml-64">
-    <div class="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-6">
+<main id="main-canvas" class="main-content">
+    
+    <div class="page-header">
         <div>
-            <h1 class="font-headline text-4xl md:text-5xl font-black uppercase tracking-tighter text-on-surface">Lobby_Environment</h1>
-            <p class="font-body text-on-surface-variant/60 mt-2 max-w-md">Connect with active operators in the sector. Challenges are live.</p>
+            <h1 class="page-title font-headline">Lobby_Environment</h1>
+            <p class="page-subtitle">Connect with active operators in the sector. Challenges are live.</p>
         </div>
-        <div class="flex items-center gap-2">
-            <span class="w-2 h-2 rounded-full bg-secondary animate-pulse"></span>
-            <span id="online-count" class="font-label text-xs text-secondary tracking-widest uppercase">— ONLINE</span>
+        <div class="live-indicator font-label">
+            <span class="pulse-dot"></span>
+            <span id="online-count">— ONLINE</span>
         </div>
     </div>
 
-    <div class="flex flex-wrap items-center gap-4 mb-8">
-        <button id="btn-filter-all" class="px-4 py-2 bg-primary text-[#002e6a] font-label text-xs font-bold rounded uppercase tracking-widest transition-colors">All_Players</button>
-        <button id="btn-filter-gm" class="px-4 py-2 bg-surface-container text-on-surface-variant font-label text-xs font-bold rounded uppercase tracking-widest hover:bg-surface-bright transition-colors">Grandmasters</button>
+    <div class="controls-bar">
+        <button id="btn-filter-all" class="filter-btn font-label active">All_Players</button>
+        <button id="btn-filter-gm" class="filter-btn font-label">Grandmasters</button>
         
-        <div class="flex md:hidden items-center bg-surface-container-highest/30 px-3 py-1.5 rounded-lg border border-outline-variant/10 flex-1">
-            <span class="material-symbols-outlined text-on-surface-variant text-sm mr-2">search</span>
-            <input id="player-search-mobile" class="bg-transparent border-none focus:ring-0 text-sm font-label uppercase tracking-widest p-0 w-full placeholder:text-on-surface-variant/40 outline-none text-[#e5e2e1]" placeholder="LOCATE_PLAYER..." type="text"/>
+        <div class="mobile-search">
+            <span class="material-symbols-outlined">search</span>
+            <input id="player-search-mobile" class="search-input font-label" placeholder="LOCATE_PLAYER..." type="text"/>
         </div>
 
-        <div class="ml-auto flex items-center gap-2 text-on-surface-variant/60 bg-surface-container px-3 py-1.5 rounded-lg border border-outline-variant/10 hover:border-[#adc6ff]/30 transition-colors">
-            <span class="material-symbols-outlined text-sm">filter_list</span>
-            <select id="sort-select" class="bg-transparent border-none text-xs uppercase tracking-widest font-label focus:ring-0 cursor-pointer appearance-none outline-none text-on-surface-variant">
-                <option value="elo-desc" class="bg-[#1c1b1b]">Sort: Rating (Highest)</option>
-                <option value="elo-asc"  class="bg-[#1c1b1b]">Sort: Rating (Lowest)</option>
-                <option value="win-desc" class="bg-[#1c1b1b]">Sort: Win Rate (Highest)</option>
-                <option value="win-asc"  class="bg-[#1c1b1b]">Sort: Win Rate (Lowest)</option>
-                <option value="name-asc" class="bg-[#1c1b1b]">Sort: Name (A-Z)</option>
-                <option value="name-desc"class="bg-[#1c1b1b]">Sort: Name (Z-A)</option>
+        <div class="sort-dropdown font-label">
+            <span class="material-symbols-outlined">filter_list</span>
+            <select id="sort-select" class="sort-select font-label">
+                <option value="elo-desc">Sort: Rating (Highest)</option>
+                <option value="elo-asc">Sort: Rating (Lowest)</option>
+                <option value="win-desc">Sort: Win Rate (Highest)</option>
+                <option value="win-asc">Sort: Win Rate (Lowest)</option>
+                <option value="name-asc">Sort: Name (A-Z)</option>
+                <option value="name-desc">Sort: Name (Z-A)</option>
             </select>
         </div>
     </div>
 
-    <div id="player-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        <div class="col-span-full flex flex-col items-center justify-center py-20 opacity-60">
-            <span class="material-symbols-outlined text-6xl text-on-surface-variant/40 mb-4 animate-pulse">radar</span>
-            <p class="font-headline font-bold text-xl text-on-surface-variant tracking-widest">SCANNING SECTOR...</p>
+    <div id="player-grid" class="player-grid">
         </div>
-    </div>
 </main>
 
-<nav class="lg:hidden fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-4 pt-2 bg-[#131313]/80 backdrop-blur-2xl border-t border-[#353534]/20 z-50">
-    <a class="flex flex-col items-center justify-center text-[#ADC6FF] bg-[#201F1F] rounded-lg py-1 px-4" href="lobby_command_center.html">
+<nav class="mobile-nav">
+    <a class="mobile-link font-label active" href="lobby_command_center.html">
         <span class="material-symbols-outlined">sports_esports</span>
-        <span class="font-label text-[10px] font-bold">Lobby</span>
+        <span>Lobby</span>
     </a>
-    <a class="flex flex-col items-center justify-center text-[#E5E2E1]/40 hover:text-[#ADC6FF] transition-all" href="leaderboard.html">
+    <a class="mobile-link font-label" href="leaderboard.html">
         <span class="material-symbols-outlined">leaderboard</span>
-        <span class="font-label text-[10px] font-bold">Leaderboard</span>
+        <span>Leaderboard</span>
     </a>
 </nav>
 
-<script>
-    function getRankName(elo) {
-        if (elo >= 2800) return "GRANDMASTER";
-        if (elo >= 2666) return "MASTER III";
-        if (elo >= 2533) return "MASTER II";
-        if (elo >= 2400) return "MASTER I";
-        if (elo >= 2300) return "DIAMOND III";
-        if (elo >= 2200) return "DIAMOND II";
-        if (elo >= 2100) return "DIAMOND I";
-        if (elo >= 2000) return "PLATINUM III";
-        if (elo >= 1900) return "PLATINUM II";
-        if (elo >= 1800) return "PLATINUM I";
-        if (elo >= 1700) return "GOLD III";
-        if (elo >= 1600) return "GOLD II";
-        if (elo >= 1500) return "GOLD I";
-        if (elo >= 1400) return "SILVER III";
-        if (elo >= 1300) return "SILVER II";
-        if (elo >= 1200) return "SILVER I";
-        if (elo >= 800)  return "BRONZE III";
-        if (elo >= 400)  return "BRONZE II";
-        return "BRONZE I";
-    }
 
-    const elo = parseInt(sessionStorage.getItem("arena_auth_elo") || "0");
-    if (elo) {
-        document.getElementById('header-elo-display').innerText = `${elo.toLocaleString()} ELO`;
-        document.getElementById('header-rank-display').innerText = getRankName(elo);
-    }
+<template id="empty-state-template">
+    <div class="empty-state">
+        <span class="material-symbols-outlined" style="font-size: 4rem;">radar</span>
+        <p class="font-headline" style="font-size: 1.25rem; font-weight: 700; margin-top: 1rem;">NO OPERATORS FOUND</p>
+        <p class="font-label" style="font-size: 0.75rem; margin-top: 0.5rem;">Backend may be offline or no players in database</p>
+    </div>
+</template>
 
-    // ── Logout: hit backend first so is_online is set FALSE ───────────────
-    async function handleLogout(e) {
-        e.preventDefault();
+<template id="player-card-template">
+    <div class="player-card font-label">
+        <div class="card-header">
+            <div class="card-avatar font-headline">
+                <span class="js-initials"></span>
+            </div>
+            <div class="card-stats">
+                <p class="card-rank js-rank"></p>
+                <p class="card-elo js-elo font-headline"></p>
+                <p class="card-winrate js-winrate"></p>
+            </div>
+        </div>
         
-        // Grab the specific UID for this exact tab
-        const myUid = sessionStorage.getItem("arena_auth_uid"); 
+        <div class="card-body">
+            <h3 class="card-name js-name font-headline"></h3>
+            <p class="card-uid js-uid"></p>
+            
+            <div class="status-badge js-badge">
+                <span class="status-dot"></span>
+                <span class="js-status-text">STATUS</span>
+            </div>
+        </div>
         
-        try {
-            await fetch('http://localhost:5001/logout', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ uid: myUid }), // Send the exact UID
-                credentials: 'include'
-            });
-        } catch (_) {}
-        
-        sessionStorage.clear();
-        window.location.href = 'login.html';
-    }
-</script>
+        <button class="card-btn js-btn font-label">
+            <span class="material-symbols-outlined js-btn-icon"></span>
+            <span class="js-btn-text">ACTION</span>
+        </button>
+    </div>
+</template>
 
 </body>
 </html>

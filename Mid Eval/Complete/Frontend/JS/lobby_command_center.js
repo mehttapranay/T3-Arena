@@ -15,9 +15,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ==========================================
-    // 2. UI ELEMENTS & STATE
+    // 2. DOM ELEMENTS & STATE
     // ==========================================
     const searchInput  = document.getElementById('player-search');
+    const mobileSearchInput = document.getElementById('player-search-mobile');
     const sortSelect   = document.getElementById('sort-select');
     const playerGrid   = document.getElementById('player-grid');
     const btnFilterAll = document.getElementById('btn-filter-all');
@@ -27,13 +28,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const mainCanvas   = document.getElementById('main-canvas');
     const onlineCountDisplay = document.getElementById('online-count');
     
-    const sidebarNameDisplay = document.getElementById('operator-name-display');
-    const sidebarEloDisplay  = document.getElementById('operator-elo-display');
-    const headerInitialsDisplay = document.getElementById('header-initials-display');
-
     let activeFilter   = 'all';
     let isMatchRunning = false;
+    let globalPlayersData = [];
 
+    setupHeaders();
+
+    // ==========================================
+    // 3. EVENT LISTENERS
+    // ==========================================
     sidebarToggle.addEventListener('click', () => {
         if (isMatchRunning) {
             alert("⚠️ SYSTEM LOCKED: Active match in progress.");
@@ -47,8 +50,34 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // Semantic Class toggling instead of Tailwind replacement
+    btnFilterAll.addEventListener('click', () => {
+        activeFilter = 'all';
+        btnFilterAll.classList.add('active');
+        btnFilterGM.classList.remove('active');
+        renderGrid();
+    });
+
+    btnFilterGM.addEventListener('click', () => {
+        activeFilter = 'gm';
+        btnFilterGM.classList.add('active');
+        btnFilterAll.classList.remove('active');
+        renderGrid();
+    });
+
+    searchInput.addEventListener('input', renderGrid);
+    sortSelect.addEventListener('change', renderGrid);
+    document.getElementById('btn-logout').addEventListener('click', handleLogout);
+
+    if (mobileSearchInput) {
+        mobileSearchInput.addEventListener('input', (e) => {
+            searchInput.value = e.target.value;
+            renderGrid();
+        });
+    }
+
     // ==========================================
-    // 3. INITIALS GENERATOR
+    // 4. LOGIC HELPERS
     // ==========================================
     function getInitials(name) {
         if (!name) return "??";
@@ -59,25 +88,45 @@ document.addEventListener('DOMContentLoaded', () => {
         return name.substring(0, 2).toUpperCase();
     }
 
-    if (headerInitialsDisplay && loggedInUser) {
-        headerInitialsDisplay.innerText = getInitials(loggedInUser);
+    function getRank(elo) {
+        if (elo >= 2800) return { name: "GRANDMASTER",  cls: "rank-gm" };
+        if (elo >= 2666) return { name: "MASTER III",   cls: "rank-master" };
+        if (elo >= 2533) return { name: "MASTER II",    cls: "rank-master" };
+        if (elo >= 2400) return { name: "MASTER I",     cls: "rank-master" };
+        if (elo >= 2300) return { name: "DIAMOND III",  cls: "rank-diamond" };
+        if (elo >= 2200) return { name: "DIAMOND II",   cls: "rank-diamond" };
+        if (elo >= 2100) return { name: "DIAMOND I",    cls: "rank-diamond" };
+        if (elo >= 2000) return { name: "PLATINUM III", cls: "rank-platinum" };
+        if (elo >= 1900) return { name: "PLATINUM II",  cls: "rank-platinum" };
+        if (elo >= 1800) return { name: "PLATINUM I",   cls: "rank-platinum" };
+        if (elo >= 1700) return { name: "GOLD III",     cls: "rank-gold" };
+        if (elo >= 1600) return { name: "GOLD II",      cls: "rank-gold" };
+        if (elo >= 1500) return { name: "GOLD I",       cls: "rank-gold" };
+        if (elo >= 1400) return { name: "SILVER III",   cls: "rank-silver" };
+        if (elo >= 1300) return { name: "SILVER II",    cls: "rank-silver" };
+        if (elo >= 1200) return { name: "SILVER I",     cls: "rank-silver" };
+        if (elo >= 800)  return { name: "BRONZE III",   cls: "rank-bronze" };
+        if (elo >= 400)  return { name: "BRONZE II",    cls: "rank-bronze" };
+        return                  { name: "BRONZE I",     cls: "rank-bronze" };
     }
 
-    // ==========================================
-    // 4. BACKEND INTEGRATION & SIDEBAR SYNC
-    // ==========================================
-    let globalPlayersData = [];
+    function setupHeaders() {
+        const loggedInElo = sessionStorage.getItem("arena_auth_elo");
+        const rankInfo = getRank(parseInt(loggedInElo || "0"));
 
-    function updateSidebarWithUserData() {
-        if (!loggedInUid) return;
-        const myData = globalPlayersData.find(p => p.uid === loggedInUid);
+        document.getElementById('header-initials-display').textContent = getInitials(loggedInUser);
+        document.getElementById('operator-name-display').textContent = loggedInUser.replaceAll('_', ' ').toUpperCase();
         
-        if (myData) {
-            if (sidebarNameDisplay) sidebarNameDisplay.innerText = myData.name.replaceAll('_', ' ').toUpperCase();
-            if (sidebarEloDisplay) sidebarEloDisplay.innerText = `${myData.elo_rating} ELO`;
+        if (loggedInElo) {
+            document.getElementById('operator-elo-display').textContent = `${loggedInElo} ELO`;
+            document.getElementById('header-elo-display').textContent = `${loggedInElo} ELO`;
+            document.getElementById('header-rank-display').textContent = rankInfo.name;
         }
     }
 
+    // ==========================================
+    // 5. BACKEND FETCHING
+    // ==========================================
     function fetchPlayers() {
         fetch('http://localhost:5001/api/players', { credentials: 'include' })
             .then(response => {
@@ -86,7 +135,6 @@ document.addEventListener('DOMContentLoaded', () => {
             })
             .then(data => {
                 globalPlayersData = data.players || [];
-                updateSidebarWithUserData(); 
                 renderGrid();
             })
             .catch(error => {
@@ -97,56 +145,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ==========================================
-    // 5. ELO → RANK
-    // ==========================================
-    function getRank(elo) {
-        if (elo >= 2800) return { name: "GRANDMASTER",  color: "text-[#ffeb3b]" };
-        if (elo >= 2666) return { name: "MASTER III",   color: "text-[#e040fb]" };
-        if (elo >= 2533) return { name: "MASTER II",    color: "text-[#e040fb]" };
-        if (elo >= 2400) return { name: "MASTER I",     color: "text-[#e040fb]" };
-        if (elo >= 2300) return { name: "DIAMOND III",  color: "text-[#00e5ff]" };
-        if (elo >= 2200) return { name: "DIAMOND II",   color: "text-[#00e5ff]" };
-        if (elo >= 2100) return { name: "DIAMOND I",    color: "text-[#00e5ff]" };
-        if (elo >= 2000) return { name: "PLATINUM III", color: "text-[#1de9b6]" };
-        if (elo >= 1900) return { name: "PLATINUM II",  color: "text-[#1de9b6]" };
-        if (elo >= 1800) return { name: "PLATINUM I",   color: "text-[#1de9b6]" };
-        if (elo >= 1700) return { name: "GOLD III",     color: "text-[#ffc107]" };
-        if (elo >= 1600) return { name: "GOLD II",      color: "text-[#ffc107]" };
-        if (elo >= 1500) return { name: "GOLD I",       color: "text-[#ffc107]" };
-        if (elo >= 1400) return { name: "SILVER III",   color: "text-[#b0bec5]" };
-        if (elo >= 1300) return { name: "SILVER II",    color: "text-[#b0bec5]" };
-        if (elo >= 1200) return { name: "SILVER I",     color: "text-[#b0bec5]" };
-        if (elo >= 800)  return { name: "BRONZE III",   color: "text-[#cd7f32]" };
-        if (elo >= 400)  return { name: "BRONZE II",    color: "text-[#cd7f32]" };
-        return                  { name: "BRONZE I",     color: "text-[#cd7f32]" };
-    }
-
-    // ==========================================
-    // 6. FILTERS
-    // ==========================================
-    btnFilterAll.addEventListener('click', () => {
-        activeFilter = 'all';
-        btnFilterAll.classList.replace('bg-surface-container', 'bg-primary');
-        btnFilterAll.classList.replace('text-on-surface-variant', 'text-[#002e6a]');
-        btnFilterGM.classList.replace('bg-primary', 'bg-surface-container');
-        btnFilterGM.classList.replace('text-[#002e6a]', 'text-on-surface-variant');
-        renderGrid();
-    });
-
-    btnFilterGM.addEventListener('click', () => {
-        activeFilter = 'gm';
-        btnFilterGM.classList.replace('bg-surface-container', 'bg-primary');
-        btnFilterGM.classList.replace('text-on-surface-variant', 'text-[#002e6a]');
-        btnFilterAll.classList.replace('bg-primary', 'bg-surface-container');
-        btnFilterAll.classList.replace('text-[#002e6a]', 'text-on-surface-variant');
-        renderGrid();
-    });
-
-    // ==========================================
-    // 7. RENDER GRID & GROUPED SORTING
+    // 6. RENDER GRID (TRADITIONAL DOM MANIPULATION)
     // ==========================================
     function renderGrid() {
         const searchTerm = searchInput.value.toLowerCase();
+        const template = document.getElementById('player-card-template');
 
         let filtered = globalPlayersData.filter(p =>
             p.name.toLowerCase().includes(searchTerm)
@@ -158,27 +161,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (onlineCountDisplay) {
             const onlineCount = globalPlayersData.filter(p => p.status === 'online' || p.status === 'fighting').length;
-            onlineCountDisplay.innerText = `${onlineCount} ONLINE`;
+            onlineCountDisplay.textContent = `${onlineCount} ONLINE`;
         }
 
         const statusWeight = { "online": 1, "fighting": 2, "offline": 3 };
         const sortMode = sortSelect.value;
         
         filtered.sort((a, b) => {
-            // Absolute Priority: Force the Logged In User to the top!
-            const isMeA = a.uid === loggedInUid;
-            const isMeB = b.uid === loggedInUid;
+            const isMeA = (a.uid === loggedInUid);
+            const isMeB = (b.uid === loggedInUid);
             if (isMeA && !isMeB) return -1;
             if (!isMeA && isMeB) return 1;
 
-            // Next Priority: Online -> Fighting -> Offline
             const weightA = statusWeight[a.status] || 3;
             const weightB = statusWeight[b.status] || 3;
-            if (weightA !== weightB) {
-                return weightA - weightB; 
-            }
+            if (weightA !== weightB) { return weightA - weightB; }
 
-            // Final Priority: The dropdown sorting
             switch (sortMode) {
                 case 'elo-desc':  return b.elo_rating - a.elo_rating;
                 case 'elo-asc':   return a.elo_rating - b.elo_rating;
@@ -193,100 +191,91 @@ document.addEventListener('DOMContentLoaded', () => {
         playerGrid.innerHTML = '';
 
         if (filtered.length === 0) {
-            playerGrid.innerHTML = `
-                <div class="col-span-full flex flex-col items-center justify-center py-20 opacity-60">
-                    <span class="material-symbols-outlined text-6xl text-on-surface-variant/40 mb-4">radar</span>
-                    <p class="font-headline font-bold text-xl text-on-surface-variant tracking-widest">NO OPERATORS FOUND</p>
-                    <p class="font-label text-xs text-on-surface-variant/40 mt-2 tracking-widest">Backend may be offline or no players in database</p>
-                </div>`;
+            const emptyTemplate = document.getElementById('empty-state-template');
+            playerGrid.appendChild(emptyTemplate.content.cloneNode(true));
             return;
         }
 
         filtered.forEach(player => {
+            const clone = template.content.cloneNode(true);
+            const cardWrapper = clone.querySelector('.player-card');
             const rankData = getRank(player.elo_rating);
-            const isMe = player.uid === loggedInUid;
-            const initials = getInitials(player.name);
+            const isMe = (player.uid === loggedInUid);
 
-            let statusClass = "";
-            let buttonState = "";
-            let statusBadge = "";
+            // Populate Text Data
+            clone.querySelector('.js-initials').textContent = getInitials(player.name);
+            clone.querySelector('.js-rank').textContent = rankData.name;
+            clone.querySelector('.js-rank').classList.add(rankData.cls);
+            clone.querySelector('.js-elo').textContent = `${player.elo_rating} ELO`;
+            clone.querySelector('.js-winrate').textContent = `WR: ${player.winrate}%`;
+            clone.querySelector('.js-name').textContent = player.name;
+            clone.querySelector('.js-uid').textContent = player.uid;
+
+            // Handle State Logics using simple CSS classes
+            const btnIcon = clone.querySelector('.js-btn-icon');
+            const btnText = clone.querySelector('.js-btn-text');
+            const statusText = clone.querySelector('.js-status-text');
 
             if (player.status === "fighting") {
-                statusClass = "bg-[#2a1313] border-[#ff5451]/30";
-                statusBadge = `<div class="flex items-center gap-1.5">
-                    <span class="w-1.5 h-1.5 rounded-full bg-[#ff5451] animate-ping"></span>
-                    <p class="font-label text-[10px] uppercase tracking-widest text-[#ff5451]">FIGHTING</p>
-                </div>`;
-                buttonState = `<button class="w-full py-3 border border-[#ff5451]/20 bg-[#ff5451]/10 text-[#ff5451] font-label font-bold text-xs tracking-widest rounded cursor-not-allowed" disabled>MATCH IN PROGRESS</button>`;
+                cardWrapper.classList.add('state-fighting');
+                statusText.textContent = "FIGHTING";
+                btnIcon.style.display = "none";
+                btnText.textContent = "MATCH IN PROGRESS";
+                clone.querySelector('.js-btn').disabled = true;
 
             } else if (player.status === "online") {
                 if (isMe) {
-                    statusClass = "bg-[#1c1b1b] border-primary/30";
-                    statusBadge = `<p class="font-label text-[10px] text-primary uppercase tracking-widest flex items-center gap-1.5">
-                        <span class="w-1.5 h-1.5 rounded-full bg-primary"></span>YOU — ONLINE
-                    </p>`;
-                    buttonState = `<button class="w-full py-3 border border-primary/20 bg-primary/5 text-primary/50 font-label font-bold text-xs tracking-widest rounded cursor-not-allowed" disabled>THIS IS YOU</button>`;
+                    cardWrapper.classList.add('state-online-me');
+                    statusText.textContent = "YOU — ONLINE";
+                    btnIcon.style.display = "none";
+                    btnText.textContent = "THIS IS YOU";
+                    clone.querySelector('.js-btn').disabled = true;
                 } else {
-                    statusClass = "bg-[#1c1b1b] hover:bg-[#201f1f]";
-                    statusBadge = `<p class="font-label text-[10px] text-secondary uppercase tracking-widest flex items-center gap-1.5">
-                        <span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>ONLINE
-                    </p>`;
-                    buttonState = `<button class="w-full py-3 border border-secondary/20 bg-secondary/5 text-secondary font-label font-bold text-xs tracking-widest rounded hover:bg-secondary hover:text-[#003824] transition-all active:scale-95 flex items-center justify-center gap-2">
-                        <span class="material-symbols-outlined text-sm">swords</span> CHALLENGE
-                    </button>`;
+                    cardWrapper.classList.add('state-online');
+                    statusText.textContent = "ONLINE";
+                    btnIcon.textContent = "swords";
+                    btnText.textContent = "CHALLENGE";
                 }
-
             } else {
-                statusClass = "bg-[#1c1b1b]/50 grayscale opacity-80";
-                statusBadge = `<p class="font-label text-[10px] text-on-surface-variant/40 uppercase tracking-widest">OFFLINE</p>`;
-                buttonState = `<button class="w-full py-3 border border-outline-variant/10 bg-transparent text-on-surface-variant/30 font-label font-bold text-xs tracking-widest rounded cursor-not-allowed" disabled>UNAVAILABLE</button>`;
+                cardWrapper.classList.add('state-offline');
+                statusText.textContent = "OFFLINE";
+                clone.querySelector('.status-dot').style.display = "none";
+                btnIcon.style.display = "none";
+                btnText.textContent = "UNAVAILABLE";
+                clone.querySelector('.js-btn').disabled = true;
             }
 
-            playerGrid.insertAdjacentHTML('beforeend', `
-                <div class="player-card group relative ${statusClass} border border-outline-variant/10 p-5 rounded-lg transition-all duration-300 hover:shadow-[0_0_20px_rgba(173,198,255,0.05)] ${isMe ? 'ring-1 ring-primary/30' : ''} flex flex-col h-full">
-                    
-                    <div class="flex-1">
-                        <div class="flex items-start justify-between mb-6 gap-2">
-                            <div class="w-16 h-16 shrink-0 rounded-full border-2 border-outline-variant bg-[#201f1f] flex items-center justify-center overflow-hidden">
-                                <span class="font-headline font-bold text-xl text-on-surface-variant">${initials}</span>
-                            </div>
-                            <div class="text-right">
-                                <p class="font-label text-[10px] ${rankData.color} uppercase tracking-widest font-bold">${rankData.name}</p>
-                                <p class="font-headline font-black text-xl text-primary tracking-tighter">${player.elo_rating} ELO</p>
-                                <p class="font-label text-[10px] text-primary/60 tracking-widest">WR: ${player.winrate}%</p>
-                            </div>
-                        </div>
-                        <div>
-                            <h3 class="font-headline text-lg font-bold text-on-surface group-hover:text-primary transition-colors">${player.name}</h3>
-                            <p class="font-label text-[10px] text-on-surface-variant/40 tracking-widest mb-1">${player.uid}</p>
-                            <div class="mb-4 mt-1">${statusBadge}</div>
-                        </div>
-                    </div>
-                    
-                    <div class="mt-auto w-full">
-                        ${buttonState}
-                    </div>
-
-                </div>
-            `);
+            playerGrid.appendChild(clone);
         });
     }
 
-    searchInput.addEventListener('input', renderGrid);
-    sortSelect.addEventListener('change', renderGrid);
-
+    // Start App Logic
     fetchPlayers();
     setInterval(fetchPlayers, 5000);
 });
 
 // ==========================================
-// 8. GHOST USER PREVENTION: Smart Tab Close Detector
+// 7. LOGOUT & GHOST USER PREVENTION
 // ==========================================
+async function handleLogout(e) {
+    if(e) e.preventDefault();
+    const myUid = sessionStorage.getItem("arena_auth_uid"); 
+    try {
+        await fetch('http://localhost:5001/logout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ uid: myUid }),
+            credentials: 'include'
+        });
+    } catch (_) {}
+    sessionStorage.clear();
+    window.location.href = 'login.html';
+}
+
 let isNavigating = false;
 
 document.addEventListener('click', (e) => {
-    const link = e.target.closest('a');
-    if (link) {
+    if (e.target.closest('a')) {
         isNavigating = true; 
     }
 });

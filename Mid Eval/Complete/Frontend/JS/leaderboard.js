@@ -1,22 +1,59 @@
 // leaderboard.js
 
+function getRankName(elo) {
+    if (elo >= 2800) return "Grandmaster";
+    if (elo >= 2666) return "Master III";
+    if (elo >= 2533) return "Master II";
+    if (elo >= 2400) return "Master I";
+    if (elo >= 2300) return "Diamond III";
+    if (elo >= 2200) return "Diamond II";
+    if (elo >= 2100) return "Diamond I";
+    if (elo >= 2000) return "Platinum III";
+    if (elo >= 1900) return "Platinum II";
+    if (elo >= 1800) return "Platinum I";
+    if (elo >= 1700) return "Gold III";
+    if (elo >= 1600) return "Gold II";
+    if (elo >= 1500) return "Gold I";
+    if (elo >= 1400) return "Silver III";
+    if (elo >= 1300) return "Silver II";
+    if (elo >= 1200) return "Silver I";
+    if (elo >= 800)  return "Bronze III";
+    if (elo >= 400)  return "Bronze II";
+    return "Bronze I";
+}
+
+async function handleLogout(e) {
+    e.preventDefault();
+    const myUid = sessionStorage.getItem("arena_auth_uid"); 
+    try {
+        await fetch('http://localhost:5001/logout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ uid: myUid }),
+            credentials: 'include'
+        });
+    } catch (_) {}
+    sessionStorage.clear();
+    window.location.href = 'login.html';
+}
+
 document.addEventListener('DOMContentLoaded', () => {
 
-    // ==========================================
-    // 1. AUTH GUARD
-    // ==========================================
+    // 1. AUTH GUARD (Now strictly enforced!)
     const loggedInUser = sessionStorage.getItem("arena_auth_user");
     const loggedInUid  = sessionStorage.getItem("arena_auth_uid");
 
     if (!loggedInUser || !loggedInUid) {
-        console.warn("SECURITY: Unauthorised access. Redirecting.");
         window.location.replace("login.html");
         return;
     }
 
-    // ==========================================
-    // 2. UI ELEMENTS & STATE
-    // ==========================================
+    const storedElo = parseInt(sessionStorage.getItem("arena_auth_elo") || "0");
+    if (storedElo) {
+        document.getElementById('header-elo-display').innerText = `${storedElo.toLocaleString()} ELO`;
+        document.getElementById('header-rank-display').innerText = getRankName(storedElo);
+    }
+
     const sidebar      = document.getElementById('sidebar');
     const sidebarToggle= document.getElementById('sidebar-toggle');
     const mainCanvas   = document.getElementById('main-canvas');
@@ -27,7 +64,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const paginationInfo  = document.getElementById('pagination-info');
     const btnFilterLive   = document.getElementById('btn-filter-live');
     const btnFilterGlobal = document.getElementById('btn-filter-global');
+    const btnLogout       = document.getElementById('btn-logout');
     
+    // Templates
+    const rowTemplate     = document.getElementById('template-table-row');
+    const podiumTemplate  = document.getElementById('template-podium-card');
+
     const sidebarNameDisplay = document.getElementById('operator-name-display');
     const sidebarEloDisplay  = document.getElementById('operator-elo-display');
     const headerInitialsDisplay = document.getElementById('header-initials-display');
@@ -35,11 +77,34 @@ document.addEventListener('DOMContentLoaded', () => {
     const PLAYERS_PER_PAGE = 10;
     let currentPage   = 1;
     let currentFilter = 'global';
+    
     let globalLeaderboardData = [];
 
     // ==========================================
-    // 3. SIDEBAR & INITIALS LOGIC
+    // SORTING & RANKING LOGIC
     // ==========================================
+    function sortAndRankData(data) {
+        // 1. Sort by ELO (descending), then by Name (alphabetical)
+        data.sort((a, b) => {
+            if (b.elo_rating !== a.elo_rating) {
+                return b.elo_rating - a.elo_rating; // Highest ELO first
+            }
+            if (b.winrate !== a.winrate) {
+                return b.winrate - a.winrate; // Highest win rate if ELO tied
+            }
+            return a.name.localeCompare(b.name);
+        });
+
+        // 2. Dynamically assign correct rankings (1, 2, 3...)
+        data.forEach((player, index) => {
+            player.rank = index + 1;
+        });
+
+        return data;
+    }
+
+    if (btnLogout) btnLogout.addEventListener('click', handleLogout);
+
     function getInitials(name) {
         if (!name) return "??";
         const parts = name.trim().split(/[_\s]+/);
@@ -47,13 +112,8 @@ document.addEventListener('DOMContentLoaded', () => {
         return name.substring(0, 2).toUpperCase();
     }
 
-    if (sidebarNameDisplay && loggedInUser) {
-        sidebarNameDisplay.innerText = loggedInUser.replaceAll('_', ' ').toUpperCase();
-    }
-
-    if (headerInitialsDisplay && loggedInUser) {
-        headerInitialsDisplay.innerText = getInitials(loggedInUser);
-    }
+    if (sidebarNameDisplay && loggedInUser) sidebarNameDisplay.innerText = loggedInUser.replaceAll('_', ' ').toUpperCase();
+    if (headerInitialsDisplay && loggedInUser) headerInitialsDisplay.innerText = getInitials(loggedInUser);
 
     sidebarToggle.addEventListener('click', () => {
         if (window.innerWidth >= 768) {
@@ -64,65 +124,57 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // ==========================================
-    // 4. FILTERING & SEARCH
-    // ==========================================
-    const activeClass   = "px-4 py-2 bg-primary text-[#002e6a] text-xs font-headline font-bold tracking-widest uppercase rounded shadow-[0_0_15px_rgba(173,198,255,0.2)] transition-colors";
-    const inactiveClass = "px-4 py-2 bg-surface-container text-on-surface-variant text-xs font-headline font-bold tracking-widest uppercase border border-outline-variant/20 rounded hover:bg-surface-bright transition-colors";
-
     btnFilterLive.addEventListener('click', () => {
-        currentFilter = 'live';
-        currentPage   = 1;
-        btnFilterLive.className   = activeClass;
-        btnFilterGlobal.className = inactiveClass;
+        currentFilter = 'live'; currentPage = 1;
+        btnFilterLive.classList.add('active-filter');
+        btnFilterGlobal.classList.remove('active-filter');
         renderTable();
     });
 
     btnFilterGlobal.addEventListener('click', () => {
-        currentFilter = 'global';
-        currentPage   = 1;
-        btnFilterGlobal.className = activeClass;
-        btnFilterLive.className   = inactiveClass;
+        currentFilter = 'global'; currentPage = 1;
+        btnFilterGlobal.classList.add('active-filter');
+        btnFilterLive.classList.remove('active-filter');
         renderTable();
     });
 
     // ==========================================
-    // 5. DATA FETCHING
+    // DATA FETCHING FROM BACKEND
     // ==========================================
     function fetchLeaderboard() {
         fetch('http://localhost:5001/api/leaderboard', { credentials: 'include' })
             .then(res => {
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
                 return res.json();
             })
             .then(data => {
-                globalLeaderboardData = data.players || [];
-                // Update Sidebar ELO if current user is found
+                const rawData = data.players || [];
+                globalLeaderboardData = sortAndRankData(rawData);
+
                 const myData = globalLeaderboardData.find(p => p.uid === loggedInUid);
-                if (myData && sidebarEloDisplay) {
-                    sidebarEloDisplay.innerText = `${myData.elo_rating} ELO`;
+                if (myData) {
+                    if (sidebarEloDisplay) sidebarEloDisplay.innerText = `${myData.elo_rating} ELO`;
+                    
+                    const headerEloDisplay = document.getElementById('header-elo-display');
+                    const headerRankDisplay = document.getElementById('header-rank-display');
+                    if (headerEloDisplay) headerEloDisplay.innerText = `${myData.elo_rating.toLocaleString()} ELO`;
+                    if (headerRankDisplay) headerRankDisplay.innerText = getRankName(myData.elo_rating);
                 }
+                
                 renderTable();
             })
             .catch(err => {
-                console.warn("Leaderboard fetch failed:", err);
+                console.error("Leaderboard fetch failed:", err);
                 globalLeaderboardData = [];
                 renderTable();
             });
     }
 
-    // ==========================================
-    // 6. RENDER LOGIC (TABLE & PODIUM)
-    // ==========================================
     function renderTable() {
-        let filtered = globalLeaderboardData;
-        if (currentFilter === 'live') {
-            filtered = globalLeaderboardData.filter(p =>
-                p.status === 'online' || p.status === 'fighting'
-            );
-        }
+        let filtered = currentFilter === 'live' 
+            ? globalLeaderboardData.filter(p => p.status === 'online' || p.status === 'fighting') 
+            : globalLeaderboardData;
 
-        // JS1 logic: Dynamic Podium based on Filter
         renderPodium(filtered);
 
         const total      = filtered.length;
@@ -139,43 +191,58 @@ document.addEventListener('DOMContentLoaded', () => {
         leaderboardBody.innerHTML = '';
 
         if (pageData.length === 0) {
-            leaderboardBody.innerHTML = `<tr><td colspan="5" class="text-center py-8 text-on-surface-variant/50 font-label tracking-widest">NO OPERATORS FOUND</td></tr>`;
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td colspan="5" class="table-empty-state">NO OPERATORS FOUND</td>`;
+            leaderboardBody.appendChild(tr);
             return;
         }
 
+        const fragment = document.createDocumentFragment();
+
         pageData.forEach(player => {
             const isMe = player.uid === loggedInUid;
-            let statusHTML = '';
-            if (player.status === 'online') {
-                statusHTML = `<span class="inline-block w-2.5 h-2.5 rounded-full bg-secondary shadow-[0_0_8px_rgba(78,222,163,0.6)]"></span>`;
-            } else if (player.status === 'fighting') {
-                statusHTML = `<span class="inline-block w-2.5 h-2.5 rounded-full bg-[#ff5451] animate-ping"></span>`;
-            } else {
-                statusHTML = `<span class="inline-block w-2.5 h-2.5 rounded-full bg-on-surface-variant/30"></span>`;
+            const rowClone = rowTemplate.content.cloneNode(true);
+            const tr = rowClone.querySelector('tr');
+
+            if (isMe) tr.classList.add('is-me');
+
+            const rankCell = rowClone.querySelector('.rank-cell');
+            rankCell.textContent = player.rank.toString().padStart(2, '0');
+            if (player.rank <= 3) rankCell.classList.add('rank-top-3');
+
+            rowClone.querySelector('.player-avatar').textContent = getInitials(player.name);
+            
+            const nameEl = rowClone.querySelector('.player-name');
+            nameEl.textContent = player.name;
+            if (isMe) nameEl.classList.add('highlight');
+
+            if (isMe) {
+                rowClone.querySelector('.player-me-tag').classList.remove('hidden');
             }
 
-            const rowClass  = isMe ? "bg-primary/5 border-l-4 border-primary hover:bg-primary/10 transition-colors" : "hover:bg-surface-bright/20 transition-colors";
-            const rankColor = player.rank <= 3 ? "text-primary" : "text-on-surface-variant";
-            const initials  = getInitials(player.name);
+            rowClone.querySelector('.player-uid').textContent = player.uid;
 
-            leaderboardBody.insertAdjacentHTML('beforeend', `
-                <tr class="${rowClass}">
-                    <td class="px-6 py-5 font-headline font-black ${rankColor} italic text-lg">${player.rank.toString().padStart(2, '0')}</td>
-                    <td class="px-6 py-5">
-                        <div class="flex items-center gap-3">
-                            <div class="w-8 h-8 rounded bg-surface-container-highest flex items-center justify-center text-on-surface-variant text-xs font-bold">${initials}</div>
-                            <div>
-                                <span class="font-headline font-bold text-sm ${isMe ? 'text-primary' : ''}">${player.name} ${isMe ? '<span class="text-[10px] text-primary/60">(YOU)</span>' : ''}</span>
-                                <p class="font-label text-[10px] text-on-surface-variant/40 tracking-widest">${player.uid}</p>
-                            </div>
-                        </div>
-                    </td>
-                    <td class="px-6 py-5 text-center">${statusHTML}</td>
-                    <td class="px-6 py-5 text-right font-mono-data ${isMe ? 'font-black text-primary' : 'font-bold text-on-surface'}">${player.elo_rating}</td>
-                    <td class="px-6 py-5 text-right font-mono-data ${isMe ? 'text-primary/80' : 'text-on-surface/80'}">${player.winrate}%</td>
-                </tr>
-            `);
+            const dot = rowClone.querySelector('.status-dot');
+            if (player.status === 'online') {
+                dot.classList.add('online');
+            } else if (player.status === 'fighting') {
+                dot.classList.add('fighting');
+            } else {
+                dot.remove(); // Removes dot node entirely for offline
+            }
+
+            const eloCell = rowClone.querySelector('.elo-cell');
+            eloCell.textContent = player.elo_rating;
+            if (isMe) eloCell.classList.add('highlight');
+
+            const winrateCell = rowClone.querySelector('.winrate-cell');
+            winrateCell.textContent = player.winrate + '%';
+            if (isMe) winrateCell.classList.add('highlight');
+
+            fragment.appendChild(rowClone);
         });
+
+        leaderboardBody.appendChild(fragment);
     }
 
     function renderPodium(players) {
@@ -184,76 +251,57 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const top3 = players.slice(0, 3);
         if (top3.length === 0) {
-            podium.innerHTML = `<div class="col-span-full text-center py-8 text-on-surface-variant/40 font-label tracking-widest text-sm">NO DATA YET</div>`;
+            podium.innerHTML = `<div class="podium-empty-state">NO DATA YET</div>`;
             return;
         }
 
         const configs = [
-            { pos: "02", border: "border-slate-400/30", numColor: "text-slate-400/10", eloColor: "text-slate-300", rankBadgeColor: "text-[#ffeb3b]", scale: "" },
-            { pos: "01", border: "border-primary/50",   numColor: "text-primary/10",   eloColor: "text-primary",   rankBadgeColor: "text-[#ffeb3b]", scale: "md:scale-105 z-10" },
-            { pos: "03", border: "border-amber-700/30", numColor: "text-amber-700/10", eloColor: "text-amber-500", rankBadgeColor: "text-[#e040fb]", scale: "" },
+            { pos: "02", cls: "rank-2" },
+            { pos: "01", cls: "rank-1" },
+            { pos: "03", cls: "rank-3" },
         ];
 
         podium.innerHTML = '';
         const slots = [
-            { player: top3[1], cfg: configs[0], order: "order-2 md:order-1" },
-            { player: top3[0], cfg: configs[1], order: "order-1 md:order-2" },
-            { player: top3[2], cfg: configs[2], order: "order-3 md:order-3" },
+            { player: top3[1], cfg: configs[0] },
+            { player: top3[0], cfg: configs[1] },
+            { player: top3[2], cfg: configs[2] },
         ];
 
-        slots.forEach(({ player, cfg, order: ord }) => {
+        const fragment = document.createDocumentFragment();
+
+        slots.forEach(({ player, cfg }) => {
             if (!player) return;
-            const initials = getInitials(player.name);
-            podium.insertAdjacentHTML('beforeend', `
-                <div class="${ord} bg-surface-container-low ${cfg.border} border-b-2 p-6 rounded-lg relative overflow-hidden shadow-[0_10px_30px_rgba(0,0,0,0.3)] ${cfg.scale} flex flex-col h-full">
-                    <div class="flex-1">
-                        <div class="absolute -right-4 -top-4 ${cfg.numColor} text-8xl font-black font-headline italic">${cfg.pos}</div>
-                        <div class="flex items-center gap-4 mb-4">
-                            <div class="w-16 h-16 rounded-full border-2 border-outline-variant bg-surface-container flex items-center justify-center shrink-0">
-                                <span class="font-headline font-bold text-xl text-on-surface-variant">${initials}</span>
-                            </div>
-                            <div>
-                                <span class="text-[10px] font-headline font-bold ${cfg.rankBadgeColor} tracking-[0.3em] uppercase mb-1 block">${player.rank <= 1 ? 'World_Apex' : 'Grandmaster'}</span>
-                                <h3 class="text-xl font-black font-headline text-on-surface">${player.name}</h3>
-                                <p class="text-[10px] text-on-surface-variant/40 font-label tracking-widest">${player.uid}</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="flex justify-between items-end mt-auto pt-4">
-                        <div>
-                            <p class="text-[10px] text-on-surface-variant font-mono-data">ELO_RATING</p>
-                            <p class="text-2xl font-black font-headline ${cfg.eloColor} tracking-tighter">${player.elo_rating.toLocaleString()}</p>
-                        </div>
-                        <div class="text-right">
-                            <p class="text-[10px] text-on-surface-variant font-mono-data">WIN_RATE</p>
-                            <p class="text-lg font-bold font-mono-data text-on-surface">${player.winrate}%</p>
-                        </div>
-                    </div>
-                </div>
-            `);
+            
+            const podClone = podiumTemplate.content.cloneNode(true);
+            const card = podClone.querySelector('.podium-card');
+            
+            card.classList.add(cfg.cls);
+            podClone.querySelector('.podium-bg-number').textContent = cfg.pos;
+            podClone.querySelector('.podium-avatar').textContent = getInitials(player.name);
+            podClone.querySelector('.podium-rank-badge').textContent = player === top3[0] ? 'World_Apex' : getRankName(player.elo_rating);
+            podClone.querySelector('.podium-name').textContent = player.name;
+            podClone.querySelector('.podium-uid').textContent = player.uid;
+            podClone.querySelector('.elo').textContent = player.elo_rating.toLocaleString();
+            podClone.querySelector('.winrate').textContent = player.winrate + '%';
+
+            fragment.appendChild(podClone);
         });
+
+        podium.appendChild(fragment);
     }
 
-    // ==========================================
-    // 7. PAGINATION & REFRESH
-    // ==========================================
     btnNext.addEventListener('click', () => {
         const filtered = currentFilter === 'live' ? globalLeaderboardData.filter(p => p.status === 'online' || p.status === 'fighting') : globalLeaderboardData;
         const totalPages = Math.ceil(filtered.length / PLAYERS_PER_PAGE);
         if (currentPage < totalPages) { currentPage++; renderTable(); }
     });
+    btnPrev.addEventListener('click', () => { if (currentPage > 1) { currentPage--; renderTable(); } });
 
-    btnPrev.addEventListener('click', () => {
-        if (currentPage > 1) { currentPage--; renderTable(); }
-    });
-
+    // Initial load fetch
     fetchLeaderboard();
-    setInterval(fetchLeaderboard, 10000);
 });
 
-// ==========================================
-// 8. GHOST USER PREVENTION
-// ==========================================
 let isNavigating = false;
 document.addEventListener('click', (e) => { if (e.target.closest('a')) isNavigating = true; });
 
@@ -262,10 +310,8 @@ window.addEventListener('beforeunload', () => {
     const myUid = sessionStorage.getItem("arena_auth_uid");
     if (myUid) {
         fetch('http://localhost:5001/logout', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ uid: myUid }),
-            keepalive: true 
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ uid: myUid }), keepalive: true 
         }).catch(() => {});
     }
 });
