@@ -1,21 +1,18 @@
-/* lobby_command_center.css */
-
-/* ==========================================
-   CSS VARIABLES (Color Palette)
-   ========================================== */
+/* root color palette mappings */
 :root {
-    --surface-dim: #131313;
-    --surface-container-highest: #353534;
-    --on-surface: #e5e2e1;
-    --primary: #adc6ff;
-    --secondary: #4edea3;
-    --surface-container-low: #1c1b1b;
-    --on-surface-variant: #c2c6d6;
-    --surface-container: #201f1f;
-    --outline-variant: #424754;
-    --surface-bright: #393939;
-    --danger: #ff5451;
-    --danger-bg: #2a1313;
+    --color-surface-dim: #131313;
+    --color-surface-highest: #353534;
+    --color-on-surface: #e5e2e1;
+    --color-primary: #adc6ff;
+    --color-secondary: #4edea3;
+    --color-surface-low: #1c1b1b;
+    --color-on-surface-var: #c2c6d6;
+    --color-surface: #201f1f;
+    --color-outline-var: #424754;
+    --color-surface-bright: #393939;
+    --color-danger: #ff5451;
+    --color-danger-bg: #2a1313;
+    
     --rank-gm: #ffeb3b;
     --rank-master: #e040fb;
     --rank-diamond: #00e5ff;
@@ -23,11 +20,12 @@
     --rank-gold: #ffc107;
     --rank-silver: #b0bec5;
     --rank-bronze: #cd7f32;
+
+    --font-header: 'Space Grotesk', sans-serif;
+    --font-body: 'Inter', sans-serif;
 }
 
-/* ==========================================
-   BASE RESET & TYPOGRAPHY
-   ========================================== */
+/* base normalise */
 * {
     margin: 0;
     padding: 0;
@@ -35,9 +33,9 @@
 }
 
 body {
-    background-color: var(--surface-dim);
-    color: var(--on-surface);
-    font-family: 'Inter', sans-serif;
+    background-color: var(--color-surface-dim);
+    color: var(--color-on-surface);
+    font-family: var(--font-body);
     overflow-x: hidden;
 }
 
@@ -45,23 +43,22 @@ a { text-decoration: none; color: inherit; }
 button, select, input { font-family: inherit; }
 .hidden { display: none !important; }
 
-.font-headline { font-family: 'Space Grotesk', sans-serif; }
-.font-label { font-family: 'Space Grotesk', sans-serif; }
+/* typography helpers */
+.font-header { font-family: var(--font-header); }
+.font-body { font-family: var(--font-body); }
 
 .material-symbols-outlined {
     font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
 }
 
-/* Scrollbar */
+/* scrollbar styling */
 ::-webkit-scrollbar { width: 8px; }
-::-webkit-scrollbar-track { background: var(--surface-dim); }
-::-webkit-scrollbar-thumb { background: var(--surface-container-highest); border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: var(--secondary); }
+::-webkit-scrollbar-track { background: var(--color-surface-dim); }
+::-webkit-scrollbar-thumb { background: var(--color-surface-highest); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-secondary); }
 
-/* ==========================================
-   HEADER (TOP NAVBAR)
-   ========================================== */
-.top-navbar {
+/* header strip */
+.top-nav {
     position: fixed;
     top: 0;
     width: 100%;
@@ -86,18 +83,18 @@ button, select, input { font-family: inherit; }
 .menu-btn {
     background: none;
     border: none;
-    color: var(--on-surface);
+    color: var(--color-on-surface);
     cursor: pointer;
     display: flex;
     align-items: center;
 }
-.menu-btn:hover { color: var(--primary); }
+.menu-btn:hover { color: var(--color-primary); }
 
 .brand-text {
     font-size: 1.25rem;
     font-weight: 900;
     font-style: italic;
-    color: var(--primary);
+    color: var(--color-primary);
     display: none;
 }
 
@@ -114,14 +111,14 @@ button, select, input { font-family: inherit; }
     background: transparent;
     border: none;
     outline: none;
-    color: var(--on-surface);
+    color: var(--color-on-surface);
     font-size: 0.875rem;
     width: 12rem;
     text-transform: uppercase;
     letter-spacing: 0.1em;
 }
 
-.user-quick-stats {
+.quick-stats {
     display: flex;
     text-align: right;
     flex-direction: column;
@@ -129,13 +126,13 @@ button, select, input { font-family: inherit; }
 
 .stat-elo {
     font-weight: 700;
-    color: var(--primary);
+    color: var(--color-primary);
     font-size: 0.875rem;
 }
 
 .stat-rank {
     font-size: 0.625rem;
-    color: var(--on-surface-variant);
+    color: var(--color-on-surface-var);
     letter-spacing: 0.1em;
     font-weight: 700;
 }
@@ -144,25 +141,23 @@ button, select, input { font-family: inherit; }
     width: 2rem;
     height: 2rem;
     border-radius: 50%;
-    background-color: var(--surface-container);
-    border: 1px solid var(--outline-variant);
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-outline-var);
     display: flex;
     align-items: center;
     justify-content: center;
     margin-left: 1rem;
 }
-.profile-avatar span { font-size: 0.75rem; font-weight: 700; color: var(--on-surface-variant); }
+.profile-avatar span { font-size: 0.75rem; font-weight: 700; color: var(--color-on-surface-var); }
 
-/* ==========================================
-   SIDEBAR NAVIGATION
-   ========================================== */
+/* side navigation drawer */
 .sidebar {
     position: fixed;
     left: 0;
     top: 0;
     height: 100vh;
     width: 16rem;
-    background-color: var(--surface-container-low);
+    background-color: var(--color-surface-low);
     border-right: 1px solid rgba(53, 53, 52, 0.15);
     padding-top: 5rem;
     display: flex;
@@ -182,15 +177,15 @@ button, select, input { font-family: inherit; }
     gap: 0.75rem;
 }
 
-.sidebar-indicator {
+.sidebar-ind {
     width: 4px;
     height: 2rem;
-    background-color: var(--primary);
+    background-color: var(--color-primary);
 }
 
 .sidebar-profile p { margin-bottom: 0.2rem; }
-.sidebar-profile-name { font-size: 0.875rem; color: var(--primary); letter-spacing: 0.1em; }
-.sidebar-profile-elo { font-size: 0.625rem; color: rgba(173, 198, 255, 0.6); }
+.profile-name { font-size: 0.875rem; color: var(--color-primary); letter-spacing: 0.1em; }
+.profile-elo { font-size: 0.625rem; color: rgba(173, 198, 255, 0.6); }
 
 .nav-links { display: flex; flex-direction: column; }
 
@@ -207,14 +202,14 @@ button, select, input { font-family: inherit; }
 }
 
 .nav-link:hover {
-    color: var(--primary);
-    background-color: var(--surface-container);
+    color: var(--color-primary);
+    background-color: var(--color-surface);
 }
 
 .nav-link.active {
-    color: var(--primary);
-    background-color: var(--surface-container);
-    border-left: 2px solid var(--primary);
+    color: var(--color-primary);
+    background-color: var(--color-surface);
+    border-left: 2px solid var(--color-primary);
 }
 
 .nav-link.danger {
@@ -226,9 +221,7 @@ button, select, input { font-family: inherit; }
     background-color: rgba(255, 180, 171, 0.1);
 }
 
-/* ==========================================
-   MAIN CONTENT AREA
-   ========================================== */
+/* center canvas container */
 .main-content {
     padding: 6rem 1.5rem;
     min-height: 100vh;
@@ -246,7 +239,7 @@ button, select, input { font-family: inherit; }
     font-size: 2.25rem;
     font-weight: 900;
     text-transform: uppercase;
-    color: var(--on-surface);
+    color: var(--color-on-surface);
 }
 
 .page-subtitle {
@@ -254,30 +247,24 @@ button, select, input { font-family: inherit; }
     margin-top: 0.5rem;
 }
 
-.live-indicator {
+.live-ind {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    color: var(--secondary);
+    color: var(--color-secondary);
     font-size: 0.75rem;
     letter-spacing: 0.1em;
 }
 
-.pulse-dot {
+/* static dot without continuous animation */
+.static-dot {
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background-color: var(--secondary);
-    animation: pulse 2s infinite;
+    background-color: var(--color-secondary);
 }
 
-@keyframes pulse {
-    0% { opacity: 1; }
-    50% { opacity: 0.4; }
-    100% { opacity: 1; }
-}
-
-/* Filters & Sorting */
+/* controls for grids */
 .controls-bar {
     display: flex;
     flex-wrap: wrap;
@@ -288,8 +275,8 @@ button, select, input { font-family: inherit; }
 
 .filter-btn {
     padding: 0.5rem 1rem;
-    background-color: var(--surface-container);
-    color: var(--on-surface-variant);
+    background-color: var(--color-surface);
+    color: var(--color-on-surface-var);
     border: none;
     border-radius: 0.25rem;
     font-size: 0.75rem;
@@ -300,10 +287,10 @@ button, select, input { font-family: inherit; }
     transition: all 0.3s ease;
 }
 
-.filter-btn:hover { background-color: var(--surface-bright); }
+.filter-btn:hover { background-color: var(--color-surface-bright); }
 
 .filter-btn.active {
-    background-color: var(--primary);
+    background-color: var(--color-primary);
     color: #002e6a;
 }
 
@@ -317,12 +304,12 @@ button, select, input { font-family: inherit; }
     border: 1px solid rgba(66, 71, 84, 0.1);
 }
 
-.sort-dropdown {
+.sort-drop {
     margin-left: auto;
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    background-color: var(--surface-container);
+    background-color: var(--color-surface);
     padding: 0.375rem 0.75rem;
     border-radius: 0.5rem;
     border: 1px solid rgba(66, 71, 84, 0.1);
@@ -331,7 +318,7 @@ button, select, input { font-family: inherit; }
 .sort-select {
     background: transparent;
     border: none;
-    color: var(--on-surface-variant);
+    color: var(--color-on-surface-var);
     font-size: 0.75rem;
     text-transform: uppercase;
     letter-spacing: 0.1em;
@@ -339,9 +326,7 @@ button, select, input { font-family: inherit; }
     cursor: pointer;
 }
 
-/* ==========================================
-   PLAYER GRID & CARDS
-   ========================================== */
+/* main visual player cards layout */
 .player-grid {
     display: grid;
     grid-template-columns: 1fr;
@@ -378,19 +363,19 @@ button, select, input { font-family: inherit; }
     width: 4rem;
     height: 4rem;
     border-radius: 50%;
-    background-color: var(--surface-container);
-    border: 2px solid var(--outline-variant);
+    background-color: var(--color-surface);
+    border: 2px solid var(--color-outline-var);
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 1.25rem;
     font-weight: 700;
-    color: var(--on-surface-variant);
+    color: var(--color-on-surface-var);
 }
 
 .card-stats { text-align: right; }
 .card-rank { font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 700; }
-.card-elo { font-size: 1.25rem; font-weight: 900; color: var(--primary); margin: 0.25rem 0; }
+.card-elo { font-size: 1.25rem; font-weight: 900; color: var(--color-primary); margin: 0.25rem 0; }
 .card-winrate { font-size: 0.625rem; color: rgba(173, 198, 255, 0.6); }
 
 .card-name { font-size: 1.125rem; font-weight: 700; margin-bottom: 0.25rem; }
@@ -406,7 +391,7 @@ button, select, input { font-family: inherit; }
     margin: 0.5rem 0 1rem 0;
 }
 
-.status-dot { width: 6px; height: 6px; border-radius: 50%; }
+.static-dot { width: 6px; height: 6px; border-radius: 50%; }
 
 .card-btn {
     width: 100%;
@@ -426,29 +411,29 @@ button, select, input { font-family: inherit; }
     transition: all 0.2s ease;
 }
 
-/* JS Dynamic States */
-.state-fighting { background-color: var(--danger-bg); border-color: rgba(255, 84, 81, 0.3); }
-.state-fighting .status-badge { color: var(--danger); }
-.state-fighting .status-dot { background-color: var(--danger); animation: pulse 1s infinite; }
-.state-fighting .card-btn { background-color: rgba(255, 84, 81, 0.1); border-color: rgba(255, 84, 81, 0.2); color: var(--danger); cursor: not-allowed; }
+/* javascript dynamic application states */
+.state-fighting { background-color: var(--color-danger-bg); border-color: rgba(255, 84, 81, 0.3); }
+.state-fighting .status-badge { color: var(--color-danger); }
+.state-fighting .static-dot { background-color: var(--color-danger); }
+.state-fighting .card-btn { background-color: rgba(255, 84, 81, 0.1); border-color: rgba(255, 84, 81, 0.2); color: var(--color-danger); cursor: not-allowed; }
 
-.state-online-me { background-color: var(--surface-container-low); box-shadow: 0 0 0 1px rgba(173, 198, 255, 0.3); }
-.state-online-me .status-badge { color: var(--primary); }
-.state-online-me .status-dot { background-color: var(--primary); }
+.state-online-me { background-color: var(--color-surface-low); box-shadow: 0 0 0 1px rgba(173, 198, 255, 0.3); }
+.state-online-me .status-badge { color: var(--color-primary); }
+.state-online-me .static-dot { background-color: var(--color-primary); }
 .state-online-me .card-btn { background-color: rgba(173, 198, 255, 0.05); border-color: rgba(173, 198, 255, 0.2); color: rgba(173, 198, 255, 0.5); cursor: not-allowed; }
 
-.state-online { background-color: var(--surface-container-low); }
-.state-online:hover { background-color: var(--surface-container); }
-.state-online .status-badge { color: var(--secondary); }
-.state-online .status-dot { background-color: var(--secondary); }
-.state-online .card-btn { background-color: rgba(78, 222, 163, 0.05); border-color: rgba(78, 222, 163, 0.2); color: var(--secondary); }
-.state-online .card-btn:hover { background-color: var(--secondary); color: #003824; }
+.state-online { background-color: var(--color-surface-low); }
+.state-online:hover { background-color: var(--color-surface); }
+.state-online .status-badge { color: var(--color-secondary); }
+.state-online .static-dot { background-color: var(--color-secondary); }
+.state-online .card-btn { background-color: rgba(78, 222, 163, 0.05); border-color: rgba(78, 222, 163, 0.2); color: var(--color-secondary); }
+.state-online .card-btn:hover { background-color: var(--color-secondary); color: #003824; }
 
 .state-offline { background-color: rgba(28, 27, 27, 0.5); filter: grayscale(100%); opacity: 0.8; }
 .state-offline .status-badge { color: rgba(194, 198, 214, 0.4); }
 .state-offline .card-btn { border-color: rgba(66, 71, 84, 0.1); color: rgba(194, 198, 214, 0.3); cursor: not-allowed; background: transparent; }
 
-/* Rank Colors */
+/* dynamic rank badges */
 .rank-gm { color: var(--rank-gm); }
 .rank-master { color: var(--rank-master); }
 .rank-diamond { color: var(--rank-diamond); }
@@ -457,9 +442,7 @@ button, select, input { font-family: inherit; }
 .rank-silver { color: var(--rank-silver); }
 .rank-bronze { color: var(--rank-bronze); }
 
-/* ==========================================
-   MOBILE BOTTOM NAVIGATION
-   ========================================== */
+/* mobile navbar stickied to bottom */
 .mobile-nav {
     position: fixed;
     bottom: 0;
@@ -484,15 +467,13 @@ button, select, input { font-family: inherit; }
 }
 
 .mobile-link.active {
-    color: var(--primary);
-    background-color: var(--surface-container);
+    color: var(--color-primary);
+    background-color: var(--color-surface);
     border-radius: 0.5rem;
     padding: 0.25rem 1rem;
 }
 
-/* ==========================================
-   MEDIA QUERIES (Responsive Design)
-   ========================================== */
+/* media bindings */
 @media (min-width: 768px) {
     .brand-text, .search-box { display: flex; }
     .mobile-search { display: none; }

@@ -1,6 +1,5 @@
-// leaderboard.js
-
-function getRankName(elo) {
+// mapping elo brackets to tier names
+function check_rank(elo) {
     if (elo >= 2800) return "Grandmaster";
     if (elo >= 2666) return "Master III";
     if (elo >= 2533) return "Master II";
@@ -22,14 +21,15 @@ function getRankName(elo) {
     return "Bronze I";
 }
 
-async function handleLogout(e) {
+// secure destruction of session logic
+async function handle_logout(e) {
     e.preventDefault();
-    const myUid = sessionStorage.getItem("arena_auth_uid"); 
+    const my_uid = sessionStorage.getItem("arena_auth_uid"); 
     try {
         await fetch('http://localhost:5001/logout', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ uid: myUid }),
+            body: JSON.stringify({ uid: my_uid }),
             credentials: 'include'
         });
     } catch (_) {}
@@ -39,279 +39,289 @@ async function handleLogout(e) {
 
 document.addEventListener('DOMContentLoaded', () => {
 
-    // 1. AUTH GUARD (Now strictly enforced!)
-    const loggedInUser = sessionStorage.getItem("arena_auth_user");
-    const loggedInUid  = sessionStorage.getItem("arena_auth_uid");
+    // auth check bounce if parameters missing
+    const auth_user = sessionStorage.getItem("arena_auth_user");
+    const auth_uid  = sessionStorage.getItem("arena_auth_uid");
 
-    if (!loggedInUser || !loggedInUid) {
+    if (!auth_user || !auth_uid) {
         window.location.replace("login.html");
         return;
     }
 
-    const storedElo = parseInt(sessionStorage.getItem("arena_auth_elo") || "0");
-    if (storedElo) {
-        document.getElementById('header-elo-display').innerText = `${storedElo.toLocaleString()} ELO`;
-        document.getElementById('header-rank-display').innerText = getRankName(storedElo);
+    // inject session baseline stats
+    const cur_elo = parseInt(sessionStorage.getItem("arena_auth_elo") || "0");
+    if (cur_elo) {
+        document.getElementById('hdr-elo').innerText = `${cur_elo.toLocaleString()} ELO`;
+        document.getElementById('hdr-rank').innerText = check_rank(cur_elo);
     }
 
+    // ui mapping nodes
     const sidebar      = document.getElementById('sidebar');
-    const sidebarToggle= document.getElementById('sidebar-toggle');
-    const mainCanvas   = document.getElementById('main-canvas');
-    const leaderboardBody = document.getElementById('leaderboard-body');
-    const btnPrev         = document.getElementById('btn-prev');
-    const btnNext         = document.getElementById('btn-next');
-    const pageIndicator   = document.getElementById('page-indicator');
-    const paginationInfo  = document.getElementById('pagination-info');
-    const btnFilterLive   = document.getElementById('btn-filter-live');
-    const btnFilterGlobal = document.getElementById('btn-filter-global');
-    const btnLogout       = document.getElementById('btn-logout');
+    const side_tog     = document.getElementById('sidebar-toggle');
+    const mn_cnt       = document.getElementById('main-content');
+    const ldb_body     = document.getElementById('ldb-body');
+    const btn_prev     = document.getElementById('btn-prev');
+    const btn_next     = document.getElementById('btn-next');
+    const pg_ind       = document.getElementById('pg-ind');
+    const pg_info      = document.getElementById('pg-info');
+    const btn_flt_live = document.getElementById('btn-flt-live');
+    const btn_flt_glob = document.getElementById('btn-flt-global');
+    const btn_logout   = document.getElementById('btn-logout');
     
-    // Templates
-    const rowTemplate     = document.getElementById('template-table-row');
-    const podiumTemplate  = document.getElementById('template-podium-card');
+    // pulling dom template fragments
+    const tmpl_row     = document.getElementById('tmpl-row');
+    const tmpl_pod     = document.getElementById('tmpl-podium');
 
-    const sidebarNameDisplay = document.getElementById('operator-name-display');
-    const sidebarEloDisplay  = document.getElementById('operator-elo-display');
-    const headerInitialsDisplay = document.getElementById('header-initials-display');
+    const op_name    = document.getElementById('op-name');
+    const op_elo     = document.getElementById('op-elo');
+    const hdr_inits  = document.getElementById('hdr-initials');
 
-    const PLAYERS_PER_PAGE = 10;
-    let currentPage   = 1;
-    let currentFilter = 'global';
-    
-    let globalLeaderboardData = [];
+    // states
+    const items_per_pg = 10;
+    let cur_pg      = 1;
+    let cur_flt     = 'global';
+    let gbl_data    = [];
 
-    // ==========================================
-    // SORTING & RANKING LOGIC
-    // ==========================================
-    function sortAndRankData(data) {
-        // 1. Sort by ELO (descending), then by Name (alphabetical)
-        data.sort((a, b) => {
+    // core sorting mechanic pushing highest elos to the tip
+    function rank_data(dt) {
+        dt.sort((a, b) => {
             if (b.elo_rating !== a.elo_rating) {
-                return b.elo_rating - a.elo_rating; // Highest ELO first
+                return b.elo_rating - a.elo_rating;
             }
             if (b.winrate !== a.winrate) {
-                return b.winrate - a.winrate; // Highest win rate if ELO tied
+                return b.winrate - a.winrate; 
             }
             return a.name.localeCompare(b.name);
         });
 
-        // 2. Dynamically assign correct rankings (1, 2, 3...)
-        data.forEach((player, index) => {
-            player.rank = index + 1;
+        // sequential rank stamping
+        dt.forEach((p, i) => {
+            p.rank = i + 1;
         });
 
-        return data;
+        return dt;
     }
 
-    if (btnLogout) btnLogout.addEventListener('click', handleLogout);
+    if (btn_logout) btn_logout.addEventListener('click', handle_logout);
 
-    function getInitials(name) {
-        if (!name) return "??";
-        const parts = name.trim().split(/[_\s]+/);
+    // split tag calculations
+    function get_initials(nm) {
+        if (!nm) return "??";
+        const parts = nm.trim().split(/[_\s]+/);
         if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-        return name.substring(0, 2).toUpperCase();
+        return nm.substring(0, 2).toUpperCase();
     }
 
-    if (sidebarNameDisplay && loggedInUser) sidebarNameDisplay.innerText = loggedInUser.replaceAll('_', ' ').toUpperCase();
-    if (headerInitialsDisplay && loggedInUser) headerInitialsDisplay.innerText = getInitials(loggedInUser);
+    // load out string arrays immediately
+    if (op_name && auth_user) op_name.innerText = auth_user.replaceAll('_', ' ').toUpperCase();
+    if (hdr_inits && auth_user) hdr_inits.innerText = get_initials(auth_user);
 
-    sidebarToggle.addEventListener('click', () => {
+    // mobile side toggler
+    side_tog.addEventListener('click', () => {
         if (window.innerWidth >= 768) {
             sidebar.classList.toggle('sidebar-hidden');
-            mainCanvas.classList.toggle('canvas-expanded');
+            mn_cnt.classList.toggle('canvas-expanded');
         } else {
             sidebar.classList.toggle('sidebar-visible');
         }
     });
 
-    btnFilterLive.addEventListener('click', () => {
-        currentFilter = 'live'; currentPage = 1;
-        btnFilterLive.classList.add('active-filter');
-        btnFilterGlobal.classList.remove('active-filter');
-        renderTable();
+    // ui active states
+    btn_flt_live.addEventListener('click', () => {
+        cur_flt = 'live'; 
+        cur_pg = 1;
+        btn_flt_live.classList.add('active-filter');
+        btn_flt_glob.classList.remove('active-filter');
+        draw_table();
     });
 
-    btnFilterGlobal.addEventListener('click', () => {
-        currentFilter = 'global'; currentPage = 1;
-        btnFilterGlobal.classList.add('active-filter');
-        btnFilterLive.classList.remove('active-filter');
-        renderTable();
+    btn_flt_glob.addEventListener('click', () => {
+        cur_flt = 'global'; 
+        cur_pg = 1;
+        btn_flt_glob.classList.add('active-filter');
+        btn_flt_live.classList.remove('active-filter');
+        draw_table();
     });
 
-    // ==========================================
-    // DATA FETCHING FROM BACKEND
-    // ==========================================
-    function fetchLeaderboard() {
+    // query backend pipe
+    function ping_data() {
         fetch('http://localhost:5001/api/leaderboard', { credentials: 'include' })
             .then(res => {
-                if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+                if (!res.ok) throw new Error(`http error! status: ${res.status}`);
                 return res.json();
             })
             .then(data => {
-                const rawData = data.players || [];
-                globalLeaderboardData = sortAndRankData(rawData);
+                const raw = data.players || [];
+                gbl_data = rank_data(raw);
 
-                const myData = globalLeaderboardData.find(p => p.uid === loggedInUid);
-                if (myData) {
-                    if (sidebarEloDisplay) sidebarEloDisplay.innerText = `${myData.elo_rating} ELO`;
+                const my_dt = gbl_data.find(p => p.uid === auth_uid);
+                if (my_dt) {
+                    if (op_elo) op_elo.innerText = `${my_dt.elo_rating} ELO`;
                     
-                    const headerEloDisplay = document.getElementById('header-elo-display');
-                    const headerRankDisplay = document.getElementById('header-rank-display');
-                    if (headerEloDisplay) headerEloDisplay.innerText = `${myData.elo_rating.toLocaleString()} ELO`;
-                    if (headerRankDisplay) headerRankDisplay.innerText = getRankName(myData.elo_rating);
+                    const hd_elo = document.getElementById('hdr-elo');
+                    const hd_rnk = document.getElementById('hdr-rank');
+                    if (hd_elo) hd_elo.innerText = `${my_dt.elo_rating.toLocaleString()} ELO`;
+                    if (hd_rnk) hd_rnk.innerText = check_rank(my_dt.elo_rating);
                 }
                 
-                renderTable();
+                draw_table();
             })
             .catch(err => {
-                console.error("Leaderboard fetch failed:", err);
-                globalLeaderboardData = [];
-                renderTable();
+                console.error("fetch failed totally:", err);
+                gbl_data = [];
+                draw_table();
             });
     }
 
-    function renderTable() {
-        let filtered = currentFilter === 'live' 
-            ? globalLeaderboardData.filter(p => p.status === 'online' || p.status === 'fighting') 
-            : globalLeaderboardData;
+    // construct raw table nodes slicing via pagination limits
+    function draw_table() {
+        let rslt = cur_flt === 'live' 
+            ? gbl_data.filter(p => p.status === 'online' || p.status === 'fighting') 
+            : gbl_data;
 
-        renderPodium(filtered);
+        draw_podium(rslt);
 
-        const total      = filtered.length;
-        const totalPages = Math.max(1, Math.ceil(total / PLAYERS_PER_PAGE));
-        const startIdx   = (currentPage - 1) * PLAYERS_PER_PAGE;
-        const endIdx     = Math.min(startIdx + PLAYERS_PER_PAGE, total);
-        const pageData   = filtered.slice(startIdx, endIdx);
+        const tot = rslt.length;
+        const tot_pgs = Math.max(1, Math.ceil(tot / items_per_pg));
+        const st_idx = (cur_pg - 1) * items_per_pg;
+        const ed_idx = Math.min(st_idx + items_per_pg, tot);
+        const pg_data = rslt.slice(st_idx, ed_idx);
 
-        paginationInfo.innerText = `SHOWING ${total > 0 ? startIdx + 1 : 0} TO ${endIdx} OF ${total} ACTIVE RECORDS`;
-        pageIndicator.innerText  = `PAGE ${currentPage.toString().padStart(2,'0')} / ${totalPages.toString().padStart(2,'0')}`;
-        btnPrev.disabled = currentPage === 1;
-        btnNext.disabled = currentPage === totalPages;
+        pg_info.innerText = `SHOWING ${tot > 0 ? st_idx + 1 : 0} TO ${ed_idx} OF ${tot} ACTIVE RECORDS`;
+        pg_ind.innerText  = `PAGE ${cur_pg.toString().padStart(2,'0')} / ${tot_pgs.toString().padStart(2,'0')}`;
+        btn_prev.disabled = cur_pg === 1;
+        btn_next.disabled = cur_pg === tot_pgs;
 
-        leaderboardBody.innerHTML = '';
+        ldb_body.innerHTML = '';
 
-        if (pageData.length === 0) {
+        if (pg_data.length === 0) {
             const tr = document.createElement('tr');
-            tr.innerHTML = `<td colspan="5" class="table-empty-state">NO OPERATORS FOUND</td>`;
-            leaderboardBody.appendChild(tr);
+            tr.innerHTML = `<td colspan="5" class="table-empty">NO OPERATORS FOUND</td>`;
+            ldb_body.appendChild(tr);
             return;
         }
 
-        const fragment = document.createDocumentFragment();
+        const frag = document.createDocumentFragment();
 
-        pageData.forEach(player => {
-            const isMe = player.uid === loggedInUid;
-            const rowClone = rowTemplate.content.cloneNode(true);
-            const tr = rowClone.querySelector('tr');
+        pg_data.forEach(p => {
+            const is_me = p.uid === auth_uid;
+            const r_cln = tmpl_row.content.cloneNode(true);
+            const tr = r_cln.querySelector('tr');
 
-            if (isMe) tr.classList.add('is-me');
+            if (is_me) tr.classList.add('is-me');
 
-            const rankCell = rowClone.querySelector('.rank-cell');
-            rankCell.textContent = player.rank.toString().padStart(2, '0');
-            if (player.rank <= 3) rankCell.classList.add('rank-top-3');
+            const rn_cell = r_cln.querySelector('.rank-cell');
+            rn_cell.textContent = p.rank.toString().padStart(2, '0');
+            if (p.rank <= 3) rn_cell.classList.add('rank-top-3');
 
-            rowClone.querySelector('.player-avatar').textContent = getInitials(player.name);
+            r_cln.querySelector('.player-avatar').textContent = get_initials(p.name);
             
-            const nameEl = rowClone.querySelector('.player-name');
-            nameEl.textContent = player.name;
-            if (isMe) nameEl.classList.add('highlight');
+            const nm_el = r_cln.querySelector('.player-name');
+            nm_el.textContent = p.name;
+            if (is_me) nm_el.classList.add('highlight');
 
-            if (isMe) {
-                rowClone.querySelector('.player-me-tag').classList.remove('hidden');
+            if (is_me) {
+                r_cln.querySelector('.player-me-tag').classList.remove('hidden');
             }
 
-            rowClone.querySelector('.player-uid').textContent = player.uid;
+            r_cln.querySelector('.player-uid').textContent = p.uid;
 
-            const dot = rowClone.querySelector('.status-dot');
-            if (player.status === 'online') {
-                dot.classList.add('online');
-            } else if (player.status === 'fighting') {
-                dot.classList.add('fighting');
+            const dt = r_cln.querySelector('.table-dot');
+            if (p.status === 'online') {
+                dt.classList.add('online');
+            } else if (p.status === 'fighting') {
+                dt.classList.add('fighting');
             } else {
-                dot.remove(); // Removes dot node entirely for offline
+                dt.remove(); 
             }
 
-            const eloCell = rowClone.querySelector('.elo-cell');
-            eloCell.textContent = player.elo_rating;
-            if (isMe) eloCell.classList.add('highlight');
+            const el_cl = r_cln.querySelector('.elo-cell');
+            el_cl.textContent = p.elo_rating;
+            if (is_me) el_cl.classList.add('highlight');
 
-            const winrateCell = rowClone.querySelector('.winrate-cell');
-            winrateCell.textContent = player.winrate + '%';
-            if (isMe) winrateCell.classList.add('highlight');
+            const wr_cl = r_cln.querySelector('.winrate-cell');
+            wr_cl.textContent = p.winrate + '%';
+            if (is_me) wr_cl.classList.add('highlight');
 
-            fragment.appendChild(rowClone);
+            frag.appendChild(r_cln);
         });
 
-        leaderboardBody.appendChild(fragment);
+        ldb_body.appendChild(frag);
     }
 
-    function renderPodium(players) {
-        const podium = document.getElementById('podium');
-        if (!podium) return;
+    // explicitly render the topmost global contenders into the visual podium blocks
+    function draw_podium(plyrs) {
+        const pod = document.getElementById('podium');
+        if (!pod) return;
 
-        const top3 = players.slice(0, 3);
-        if (top3.length === 0) {
-            podium.innerHTML = `<div class="podium-empty-state">NO DATA YET</div>`;
+        const tp3 = plyrs.slice(0, 3);
+        if (tp3.length === 0) {
+            pod.innerHTML = `<div class="loading-state">NO DATA YET</div>`;
             return;
         }
 
-        const configs = [
+        const cfg_map = [
             { pos: "02", cls: "rank-2" },
             { pos: "01", cls: "rank-1" },
             { pos: "03", cls: "rank-3" },
         ];
 
-        podium.innerHTML = '';
-        const slots = [
-            { player: top3[1], cfg: configs[0] },
-            { player: top3[0], cfg: configs[1] },
-            { player: top3[2], cfg: configs[2] },
+        pod.innerHTML = '';
+        const chnks = [
+            { p_obj: tp3[1], cg: cfg_map[0] },
+            { p_obj: tp3[0], cg: cfg_map[1] },
+            { p_obj: tp3[2], cg: cfg_map[2] },
         ];
 
-        const fragment = document.createDocumentFragment();
+        const p_frag = document.createDocumentFragment();
 
-        slots.forEach(({ player, cfg }) => {
-            if (!player) return;
+        chnks.forEach(({ p_obj, cg }) => {
+            if (!p_obj) return;
             
-            const podClone = podiumTemplate.content.cloneNode(true);
-            const card = podClone.querySelector('.podium-card');
+            const p_cln = tmpl_pod.content.cloneNode(true);
+            const crd = p_cln.querySelector('.podium-card');
             
-            card.classList.add(cfg.cls);
-            podClone.querySelector('.podium-bg-number').textContent = cfg.pos;
-            podClone.querySelector('.podium-avatar').textContent = getInitials(player.name);
-            podClone.querySelector('.podium-rank-badge').textContent = player === top3[0] ? 'World_Apex' : getRankName(player.elo_rating);
-            podClone.querySelector('.podium-name').textContent = player.name;
-            podClone.querySelector('.podium-uid').textContent = player.uid;
-            podClone.querySelector('.elo').textContent = player.elo_rating.toLocaleString();
-            podClone.querySelector('.winrate').textContent = player.winrate + '%';
+            crd.classList.add(cg.cls);
+            p_cln.querySelector('.podium-bg-num').textContent = cg.pos;
+            p_cln.querySelector('.podium-avatar').textContent = get_initials(p_obj.name);
+            p_cln.querySelector('.podium-badge').textContent = check_rank(p_obj.elo_rating);
+            p_cln.querySelector('.podium-name').textContent = p_obj.name;
+            p_cln.querySelector('.podium-uid').textContent = p_obj.uid;
+            p_cln.querySelector('.elo').textContent = p_obj.elo_rating.toLocaleString();
+            p_cln.querySelector('.winrate').textContent = p_obj.winrate + '%';
 
-            fragment.appendChild(podClone);
+            p_frag.appendChild(p_cln);
         });
 
-        podium.appendChild(fragment);
+        pod.appendChild(p_frag);
     }
 
-    btnNext.addEventListener('click', () => {
-        const filtered = currentFilter === 'live' ? globalLeaderboardData.filter(p => p.status === 'online' || p.status === 'fighting') : globalLeaderboardData;
-        const totalPages = Math.ceil(filtered.length / PLAYERS_PER_PAGE);
-        if (currentPage < totalPages) { currentPage++; renderTable(); }
+    // pagination event binds
+    btn_next.addEventListener('click', () => {
+        const rslt = cur_flt === 'live' ? gbl_data.filter(p => p.status === 'online' || p.status === 'fighting') : gbl_data;
+        const tot = Math.ceil(rslt.length / items_per_pg);
+        if (cur_pg < tot) { cur_pg++; draw_table(); }
     });
-    btnPrev.addEventListener('click', () => { if (currentPage > 1) { currentPage--; renderTable(); } });
+    
+    btn_prev.addEventListener('click', () => { 
+        if (cur_pg > 1) { cur_pg--; draw_table(); } 
+    });
 
-    // Initial load fetch
-    fetchLeaderboard();
+    ping_data();
 });
 
-let isNavigating = false;
-document.addEventListener('click', (e) => { if (e.target.closest('a')) isNavigating = true; });
+// safety listener blocking stale sessions
+let is_nav = false;
+document.addEventListener('click', (e) => { if (e.target.closest('a')) is_nav = true; });
 
+// backchannel pulse before window crash
 window.addEventListener('beforeunload', () => {
-    if (isNavigating) return;
-    const myUid = sessionStorage.getItem("arena_auth_uid");
-    if (myUid) {
+    if (is_nav) return;
+    const auth_uid = sessionStorage.getItem("arena_auth_uid");
+    if (auth_uid) {
         fetch('http://localhost:5001/logout', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ uid: myUid }), keepalive: true 
+            body: JSON.stringify({ uid: auth_uid }), keepalive: true 
         }).catch(() => {});
     }
 });

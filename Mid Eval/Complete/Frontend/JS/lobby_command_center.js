@@ -1,85 +1,79 @@
-// lobby_command_center.js
-
 document.addEventListener('DOMContentLoaded', () => {
 
-    // ==========================================
-    // 1. AUTH GUARD
-    // ==========================================
-    const loggedInUser = sessionStorage.getItem("arena_auth_user");
-    const loggedInUid  = sessionStorage.getItem("arena_auth_uid");
+    // early exit guard if session is missing standard credentials
+    const auth_user = sessionStorage.getItem("arena_auth_user");
+    const auth_uid  = sessionStorage.getItem("arena_auth_uid");
 
-    if (!loggedInUser || !loggedInUid) {
-        console.warn("SECURITY: Unauthorised access. Redirecting.");
+    if (!auth_user || !auth_uid) {
+        console.warn("security violation detected. bouncing to login.");
         window.location.replace("login.html");
         return;
     }
 
-    // ==========================================
-    // 2. DOM ELEMENTS & STATE
-    // ==========================================
-    const searchInput  = document.getElementById('player-search');
-    const mobileSearchInput = document.getElementById('player-search-mobile');
-    const sortSelect   = document.getElementById('sort-select');
-    const playerGrid   = document.getElementById('player-grid');
-    const btnFilterAll = document.getElementById('btn-filter-all');
-    const btnFilterGM  = document.getElementById('btn-filter-gm');
+    // ui binding nodes mapping into js space
+    const src_input  = document.getElementById('player-search');
+    const mob_src_input = document.getElementById('mobile-search-input');
+    const srt_sel   = document.getElementById('sort-select');
+    const ply_grid   = document.getElementById('player-grid');
+    const btn_flt_all = document.getElementById('btn-filter-all');
+    const btn_flt_gm  = document.getElementById('btn-filter-gm');
     const sidebar      = document.getElementById('sidebar');
-    const sidebarToggle= document.getElementById('sidebar-toggle');
-    const mainCanvas   = document.getElementById('main-canvas');
-    const onlineCountDisplay = document.getElementById('online-count');
+    const side_tog     = document.getElementById('sidebar-toggle');
+    const mn_cnt       = document.getElementById('main-content');
+    const online_count = document.getElementById('online-count');
     
-    let activeFilter   = 'all';
-    let isMatchRunning = false;
-    let globalPlayersData = [];
+    let cur_flt = 'all';
+    let is_match_running = false;
+    let global_players = [];
 
-    setupHeaders();
+    // init user stats before any bulk queries
+    prep_headers();
 
-    // ==========================================
-    // 3. EVENT LISTENERS
-    // ==========================================
-    sidebarToggle.addEventListener('click', () => {
-        if (isMatchRunning) {
-            alert("⚠️ SYSTEM LOCKED: Active match in progress.");
+    // attach standard interactions
+    side_tog.addEventListener('click', () => {
+        if (is_match_running) {
+            alert("system locked: match currently in progress.");
             return;
         }
+        
+        // desktop vs mobile drawer handling
         if (window.innerWidth >= 768) {
             sidebar.classList.toggle('sidebar-hidden');
-            mainCanvas.classList.toggle('canvas-expanded');
+            mn_cnt.classList.toggle('canvas-expanded');
         } else {
             sidebar.classList.toggle('sidebar-visible');
         }
     });
 
-    // Semantic Class toggling instead of Tailwind replacement
-    btnFilterAll.addEventListener('click', () => {
-        activeFilter = 'all';
-        btnFilterAll.classList.add('active');
-        btnFilterGM.classList.remove('active');
-        renderGrid();
+    // filter button binds swapping visual active states
+    btn_flt_all.addEventListener('click', () => {
+        cur_flt = 'all';
+        btn_flt_all.classList.add('active');
+        btn_flt_gm.classList.remove('active');
+        draw_grid();
     });
 
-    btnFilterGM.addEventListener('click', () => {
-        activeFilter = 'gm';
-        btnFilterGM.classList.add('active');
-        btnFilterAll.classList.remove('active');
-        renderGrid();
+    btn_flt_gm.addEventListener('click', () => {
+        cur_flt = 'gm';
+        btn_flt_gm.classList.add('active');
+        btn_flt_all.classList.remove('active');
+        draw_grid();
     });
 
-    searchInput.addEventListener('input', renderGrid);
-    sortSelect.addEventListener('change', renderGrid);
-    document.getElementById('btn-logout').addEventListener('click', handleLogout);
+    src_input.addEventListener('input', draw_grid);
+    srt_sel.addEventListener('change', draw_grid);
+    document.getElementById('btn-logout').addEventListener('click', handle_logout);
 
-    if (mobileSearchInput) {
-        mobileSearchInput.addEventListener('input', (e) => {
-            searchInput.value = e.target.value;
-            renderGrid();
+    // mirror mobile search to main logic
+    if (mob_src_input) {
+        mob_src_input.addEventListener('input', (e) => {
+            src_input.value = e.target.value;
+            draw_grid();
         });
     }
 
-    // ==========================================
-    // 4. LOGIC HELPERS
-    // ==========================================
-    function getInitials(name) {
+    // calculates letters to stamp onto player avatar circles
+    function get_initials(name) {
         if (!name) return "??";
         const parts = name.trim().split(/[_\s]+/);
         if (parts.length >= 2) {
@@ -88,7 +82,8 @@ document.addEventListener('DOMContentLoaded', () => {
         return name.substring(0, 2).toUpperCase();
     }
 
-    function getRank(elo) {
+    // rating tier lookup map based on elo threshold brackets
+    function check_rank(elo) {
         if (elo >= 2800) return { name: "GRANDMASTER",  cls: "rank-gm" };
         if (elo >= 2666) return { name: "MASTER III",   cls: "rank-master" };
         if (elo >= 2533) return { name: "MASTER II",    cls: "rank-master" };
@@ -110,74 +105,73 @@ document.addEventListener('DOMContentLoaded', () => {
         return                  { name: "BRONZE I",     cls: "rank-bronze" };
     }
 
-    function setupHeaders() {
-        const loggedInElo = sessionStorage.getItem("arena_auth_elo");
-        const rankInfo = getRank(parseInt(loggedInElo || "0"));
+    // injects session data visually into the upper top UI
+    function prep_headers() {
+        const auth_elo = sessionStorage.getItem("arena_auth_elo");
+        const rnks = check_rank(parseInt(auth_elo || "0"));
 
-        document.getElementById('header-initials-display').textContent = getInitials(loggedInUser);
-        document.getElementById('operator-name-display').textContent = loggedInUser.replaceAll('_', ' ').toUpperCase();
+        document.getElementById('hdr-initials').textContent = get_initials(auth_user);
+        document.getElementById('op-name').textContent = auth_user.replaceAll('_', ' ').toUpperCase();
         
-        if (loggedInElo) {
-            document.getElementById('operator-elo-display').textContent = `${loggedInElo} ELO`;
-            document.getElementById('header-elo-display').textContent = `${loggedInElo} ELO`;
-            document.getElementById('header-rank-display').textContent = rankInfo.name;
+        if (auth_elo) {
+            document.getElementById('op-elo').textContent = `${auth_elo} ELO`;
+            document.getElementById('hdr-elo').textContent = `${auth_elo} ELO`;
+            document.getElementById('hdr-rank').textContent = rnks.name;
         }
     }
 
-    // ==========================================
-    // 5. BACKEND FETCHING
-    // ==========================================
-    function fetchPlayers() {
+    // pings backend api periodically to gather updated competitor profiles
+    function ping_data() {
         fetch('http://localhost:5001/api/players', { credentials: 'include' })
-            .then(response => {
-                if (!response.ok) throw new Error(`Server error: ${response.status}`);
-                return response.json();
+            .then(res => {
+                if (!res.ok) throw new Error(`server crash code: ${res.status}`);
+                return res.json();
             })
-            .then(data => {
-                globalPlayersData = data.players || [];
-                renderGrid();
+            .then(dt => {
+                global_players = dt.players || [];
+                draw_grid();
             })
-            .catch(error => {
-                console.warn("Backend unavailable:", error);
-                globalPlayersData = [];
-                renderGrid();
+            .catch(er => {
+                console.warn("api pipe unavailable:", er);
+                global_players = [];
+                draw_grid();
             });
     }
 
-    // ==========================================
-    // 6. RENDER GRID (TRADITIONAL DOM MANIPULATION)
-    // ==========================================
-    function renderGrid() {
-        const searchTerm = searchInput.value.toLowerCase();
-        const template = document.getElementById('player-card-template');
+    // reconstructs the html dom table reflecting latest sorted and filtered data objects
+    function draw_grid() {
+        const qry = src_input.value.toLowerCase();
+        const tmpl = document.getElementById('tmpl-card');
 
-        let filtered = globalPlayersData.filter(p =>
-            p.name.toLowerCase().includes(searchTerm)
+        let rslt = global_players.filter(p =>
+            p.name.toLowerCase().includes(qry)
         );
 
-        if (activeFilter === 'gm') {
-            filtered = filtered.filter(p => p.elo_rating >= 2800);
+        if (cur_flt === 'gm') {
+            rslt = rslt.filter(p => p.elo_rating >= 2800);
         }
 
-        if (onlineCountDisplay) {
-            const onlineCount = globalPlayersData.filter(p => p.status === 'online' || p.status === 'fighting').length;
-            onlineCountDisplay.textContent = `${onlineCount} ONLINE`;
+        // tally up active targets to display in main viewport label
+        if (online_count) {
+            const live = global_players.filter(p => p.status === 'online' || p.status === 'fighting').length;
+            online_count.textContent = `${live} ONLINE`;
         }
 
-        const statusWeight = { "online": 1, "fighting": 2, "offline": 3 };
-        const sortMode = sortSelect.value;
+        const wt = { "online": 1, "fighting": 2, "offline": 3 };
+        const srt_md = srt_sel.value;
         
-        filtered.sort((a, b) => {
-            const isMeA = (a.uid === loggedInUid);
-            const isMeB = (b.uid === loggedInUid);
-            if (isMeA && !isMeB) return -1;
-            if (!isMeA && isMeB) return 1;
+        // custom sorting putting current player on top always, then handling the selected criteria
+        rslt.sort((a, b) => {
+            const is_me_a = (a.uid === auth_uid);
+            const is_me_b = (b.uid === auth_uid);
+            if (is_me_a && !is_me_b) return -1;
+            if (!is_me_a && is_me_b) return 1;
 
-            const weightA = statusWeight[a.status] || 3;
-            const weightB = statusWeight[b.status] || 3;
-            if (weightA !== weightB) { return weightA - weightB; }
+            const wa = wt[a.status] || 3;
+            const wb = wt[b.status] || 3;
+            if (wa !== wb) { return wa - wb; }
 
-            switch (sortMode) {
+            switch (srt_md) {
                 case 'elo-desc':  return b.elo_rating - a.elo_rating;
                 case 'elo-asc':   return a.elo_rating - b.elo_rating;
                 case 'win-desc':  return b.winrate - a.winrate;
@@ -188,108 +182,109 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        playerGrid.innerHTML = '';
+        // wipe existing grid entirely before stamp cycle
+        ply_grid.innerHTML = '';
 
-        if (filtered.length === 0) {
-            const emptyTemplate = document.getElementById('empty-state-template');
-            playerGrid.appendChild(emptyTemplate.content.cloneNode(true));
+        if (rslt.length === 0) {
+            const et = document.getElementById('tmpl-empty');
+            ply_grid.appendChild(et.content.cloneNode(true));
             return;
         }
 
-        filtered.forEach(player => {
-            const clone = template.content.cloneNode(true);
-            const cardWrapper = clone.querySelector('.player-card');
-            const rankData = getRank(player.elo_rating);
-            const isMe = (player.uid === loggedInUid);
+        // stamp each player card individually modifying template bindings
+        rslt.forEach(p => {
+            const cln = tmpl.content.cloneNode(true);
+            const card_wrap = cln.querySelector('.player-card');
+            const p_rnk = check_rank(p.elo_rating);
+            const is_me = (p.uid === auth_uid);
 
-            // Populate Text Data
-            clone.querySelector('.js-initials').textContent = getInitials(player.name);
-            clone.querySelector('.js-rank').textContent = rankData.name;
-            clone.querySelector('.js-rank').classList.add(rankData.cls);
-            clone.querySelector('.js-elo').textContent = `${player.elo_rating} ELO`;
-            clone.querySelector('.js-winrate').textContent = `WR: ${player.winrate}%`;
-            clone.querySelector('.js-name').textContent = player.name;
-            clone.querySelector('.js-uid').textContent = player.uid;
+            cln.querySelector('.js-initials').textContent = get_initials(p.name);
+            cln.querySelector('.js-rank').textContent = p_rnk.name;
+            cln.querySelector('.js-rank').classList.add(p_rnk.cls);
+            cln.querySelector('.js-elo').textContent = `${p.elo_rating} ELO`;
+            cln.querySelector('.js-winrate').textContent = `WR: ${p.winrate}%`;
+            cln.querySelector('.js-name').textContent = p.name;
+            cln.querySelector('.js-uid').textContent = p.uid;
 
-            // Handle State Logics using simple CSS classes
-            const btnIcon = clone.querySelector('.js-btn-icon');
-            const btnText = clone.querySelector('.js-btn-text');
-            const statusText = clone.querySelector('.js-status-text');
+            // map visual button elements
+            const btn_icn = cln.querySelector('.js-btn-icn');
+            const bt_txt = cln.querySelector('.js-btn-text');
+            const sts_txt = cln.querySelector('.js-status-text');
 
-            if (player.status === "fighting") {
-                cardWrapper.classList.add('state-fighting');
-                statusText.textContent = "FIGHTING";
-                btnIcon.style.display = "none";
-                btnText.textContent = "MATCH IN PROGRESS";
-                clone.querySelector('.js-btn').disabled = true;
+            // lock visually depending on if they are in combat, user, or available
+            if (p.status === "fighting") {
+                card_wrap.classList.add('state-fighting');
+                sts_txt.textContent = "FIGHTING";
+                btn_icn.style.display = "none";
+                bt_txt.textContent = "MATCH IN PROGRESS";
+                cln.querySelector('.js-btn').disabled = true;
 
-            } else if (player.status === "online") {
-                if (isMe) {
-                    cardWrapper.classList.add('state-online-me');
-                    statusText.textContent = "YOU — ONLINE";
-                    btnIcon.style.display = "none";
-                    btnText.textContent = "THIS IS YOU";
-                    clone.querySelector('.js-btn').disabled = true;
+            } else if (p.status === "online") {
+                if (is_me) {
+                    card_wrap.classList.add('state-online-me');
+                    sts_txt.textContent = "YOU — ONLINE";
+                    btn_icn.style.display = "none";
+                    bt_txt.textContent = "THIS IS YOU";
+                    cln.querySelector('.js-btn').disabled = true;
                 } else {
-                    cardWrapper.classList.add('state-online');
-                    statusText.textContent = "ONLINE";
-                    btnIcon.textContent = "swords";
-                    btnText.textContent = "CHALLENGE";
+                    card_wrap.classList.add('state-online');
+                    sts_txt.textContent = "ONLINE";
+                    btn_icn.textContent = "swords";
+                    bt_txt.textContent = "CHALLENGE";
                 }
             } else {
-                cardWrapper.classList.add('state-offline');
-                statusText.textContent = "OFFLINE";
-                clone.querySelector('.status-dot').style.display = "none";
-                btnIcon.style.display = "none";
-                btnText.textContent = "UNAVAILABLE";
-                clone.querySelector('.js-btn').disabled = true;
+                card_wrap.classList.add('state-offline');
+                sts_txt.textContent = "OFFLINE";
+                cln.querySelector('.static-dot').style.display = "none";
+                btn_icn.style.display = "none";
+                bt_txt.textContent = "UNAVAILABLE";
+                cln.querySelector('.js-btn').disabled = true;
             }
 
-            playerGrid.appendChild(clone);
+            ply_grid.appendChild(cln);
         });
     }
 
-    // Start App Logic
-    fetchPlayers();
-    setInterval(fetchPlayers, 5000);
+    // kick off infinite api loop
+    ping_data();
+    setInterval(ping_data, 5000);
 });
 
-// ==========================================
-// 7. LOGOUT & GHOST USER PREVENTION
-// ==========================================
-async function handleLogout(e) {
+// executes secure logout wiping session arrays and informing backend
+async function handle_logout(e) {
     if(e) e.preventDefault();
-    const myUid = sessionStorage.getItem("arena_auth_uid"); 
+    const my_uid = sessionStorage.getItem("arena_auth_uid"); 
     try {
         await fetch('http://localhost:5001/logout', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ uid: myUid }),
+            body: JSON.stringify({ uid: my_uid }),
             credentials: 'include'
         });
     } catch (_) {}
+    
     sessionStorage.clear();
     window.location.href = 'login.html';
 }
 
-let isNavigating = false;
-
+// track valid link clicks to avoid ghost logout when just navigating app
+let is_nav = false;
 document.addEventListener('click', (e) => {
     if (e.target.closest('a')) {
-        isNavigating = true; 
+        is_nav = true; 
     }
 });
 
+// fires a stealth api call backwards as tab crashes or closes
 window.addEventListener('beforeunload', () => {
-    if (isNavigating) return; 
+    if (is_nav) return; 
 
-    const myUid = sessionStorage.getItem("arena_auth_uid");
-    
-    if (myUid) {
+    const my_uid = sessionStorage.getItem("arena_auth_uid");
+    if (my_uid) {
         fetch('http://localhost:5001/logout', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ uid: myUid }),
+            body: JSON.stringify({ uid: my_uid }),
             keepalive: true 
         }).catch(() => {}); 
     }

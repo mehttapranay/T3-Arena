@@ -23,9 +23,10 @@
 ---
 
 ### UV Add Commands:
+<pre>
 1) uv add mysql-connector-python pymongo python-dotenv
-2) uv add flask flask-cors face-recognition numpy pillow "setuptools<70" requests
-
+2) uv add fastapi uvicorn face-recognition itsdangerous numpy pillow "setuptools<70" requests
+</pre>
 ---
 
 ### .env configurations (near `harvester.py`):

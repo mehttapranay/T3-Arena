@@ -6,140 +6,118 @@ import pymongo
 import base64
 from dotenv import load_dotenv
 
-current_dir = os.path.dirname(os.path.abspath(__file__))
-env_path    = os.path.join(current_dir, ".env")
-load_dotenv(env_path)
+cur_dir = os.path.dirname(os.path.abspath(__file__))
+env_pth = os.path.join(cur_dir, ".env")
+load_dotenv(env_pth)
 
-REQUEST_TIMEOUT = 5
+REQ_TOUT = 5
 
+def start_harvest(csv_path_1, csv_path_2):
 
-def harvest_images(csv_filepath):
-
-    # ── MySQL ──────────────────────────────────────────────────────────────
+    # init mysql pipe
     try:
-        db_connection = mysql.connector.connect(
+        db_conn = mysql.connector.connect(
             host=os.getenv("DB_HOST", "localhost"),
             user=os.getenv("DB_USER", "root"),
             password=os.getenv("DB_PASSWORD"),
             database=os.getenv("DB_NAME", "arena_db")
         )
-        cursor = db_connection.cursor()
-        print("✅ Connected to MySQL")
+        sql_cur = db_conn.cursor()
+        print("mysql pipeline secured")
     except mysql.connector.Error as err:
-        print(f"❌ MySQL connection failed: {err}")
+        print(f"mysql connection failed: {err}")
         return
 
-    # ── MongoDB ────────────────────────────────────────────────────────────
+    # init mongo pipe for blob storage
     try:
-        mongo_client     = pymongo.MongoClient(os.getenv("MONGO_URI", "mongodb://localhost:27017"))
-        mongo_db         = mongo_client[os.getenv("DB_NAME", "arena_db")]
-        mongo_collection = mongo_db["profile_images"]
-        print("✅ Connected to MongoDB")
+        mg_conn = pymongo.MongoClient(os.getenv("MONGO_URI", "mongodb://localhost:27017"))
+        mg_db   = mg_conn[os.getenv("DB_NAME", "arena_db")]
+        mg_col  = mg_db["profile_images"]
+        print("mongodb pipeline secured")
     except Exception as e:
-        print(f"❌ MongoDB connection failed: {e}")
+        print(f"mongodb connection failed: {e}")
         return
 
-    # ── Process each row ───────────────────────────────────────────────────
-    with open(csv_filepath, mode='r', encoding='utf-8') as file:
-        csv_reader = csv.DictReader(file)
+    # helper dictating fetch logic for a given target file layout
+    def scrape_file(f_path, is_ta_list=False):
+        print(f"\n--- scraping {os.path.basename(f_path)} ---")
+        with open(f_path, mode='r', encoding='utf-8') as f:
+            csv_hdr = csv.DictReader(f)
 
-        for row in csv_reader:
-            uid      = row.get('uid')
-            name     = row.get('name')
-            base_url = row.get('website_url')
-
-            if not base_url:
-                print(f"⚠️  No URL for {name} ({uid}). Skipping...")
-                continue
-
-            # FIX: use the URL exactly as given in CSV — don't prepend https://
-            # The CSV website_url may already include the protocol.
-            # Strip trailing slash and build the image path.
-            base_url  = base_url.rstrip('/')
-            # If no protocol present, add https://
-            if not base_url.startswith('http'):
-                base_url = 'https://' + base_url
-            image_url = f"{base_url}/images/pfp.jpg"
-
-            print(f"\n→ Fetching image for {name} ({uid})")
-            print(f"  URL: {image_url}")
-
-            try:
-                response = requests.get(image_url, timeout=REQUEST_TIMEOUT)
-
-                if response.status_code == 200:
-                    print(f"  ✅ Image downloaded.")
-
-                    # ── Save to MySQL (table = users, as per spec) ──────────
-                    try:
-                        # FIX: table name is 'users' not 'players'
-                        cursor.execute("""
-                            INSERT INTO users (uid, name, elo_rating, is_online)
-                            VALUES (%s, %s, %s, %s)
-                            ON DUPLICATE KEY UPDATE name = VALUES(name)
-                        """, (uid, name, 1200, False))
-                        db_connection.commit()
-                        print(f"  ✅ MySQL: saved metadata.")
-                    except mysql.connector.Error as err:
-                        print(f"  ❌ MySQL error: {err}")
-
-                    # ── Save image to MongoDB as base64 ─────────────────────
-                    try:
-                        encoded_image = base64.b64encode(response.content).decode('utf-8')
-                        mongo_collection.update_one(
-                            {"uid": uid},
-                            {"$set": {"uid": uid, "image_data": encoded_image}},
-                            upsert=True
-                        )
-                        print(f"  ✅ MongoDB: saved profile image.")
-                    except Exception as e:
-                        print(f"  ❌ MongoDB error: {e}")
-
-                elif response.status_code == 404:
-                    # FIX: on 404, still insert user into MySQL (no image)
-                    print(f"  ⚠️  HTTP 404 — no image. Inserting metadata only.")
-                    try:
-                        cursor.execute("""
-                            INSERT INTO users (uid, name, elo_rating, is_online)
-                            VALUES (%s, %s, %s, %s)
-                            ON DUPLICATE KEY UPDATE name = VALUES(name)
-                        """, (uid, name, 1200, False))
-                        db_connection.commit()
-                        print(f"  ✅ MySQL: metadata saved (no image).")
-                    except mysql.connector.Error as err:
-                        print(f"  ❌ MySQL error: {err}")
+            for rw in csv_hdr:
+                uid    = rw.get('uid')
+                nm     = rw.get('name')
+                
+                # adapt parsing dynamically based on file struct difference
+                if is_ta_list:
+                    base_url = rw.get('url')
+                    img_src = f"https://{base_url}"
                 else:
-                    print(f"  ⚠️  HTTP {response.status_code} — skipping.")
+                    base_url = rw.get('website_url')
+                    img_src = f"https://{base_url}/images/pfp.jpg"
 
-            except requests.exceptions.Timeout:
-                print(f"  ⚠️  Timeout for {uid}. Inserting metadata only.")
+                print(f"fetching meta for: {nm} ({uid})")
+                
                 try:
-                    cursor.execute("""
-                        INSERT INTO users (uid, name, elo_rating, is_online)
-                        VALUES (%s, %s, %s, %s)
-                        ON DUPLICATE KEY UPDATE name = VALUES(name)
-                    """, (uid, name, 1200, False))
-                    db_connection.commit()
-                except mysql.connector.Error:
-                    pass
+                    res = requests.get(img_src, timeout=REQ_TOUT)
 
-            except requests.exceptions.ConnectionError:
-                print(f"  ⚠️  Connection error for {uid}. Skipping.")
+                    if res.status_code == 200:
+                        
+                        # dump core metrics to relational db
+                        try:
+                            sql_cur.execute("""
+                                INSERT INTO users (uid, name, elo_rating, is_online)
+                                VALUES (%s, %s, %s, %s)
+                                ON DUPLICATE KEY UPDATE name = VALUES(name)
+                            """, (uid, nm, 1200, False))
+                            db_conn.commit()
+                        except mysql.connector.Error as err:
+                            print(f"sql fail -> {err}")
 
-            except requests.exceptions.RequestException as e:
-                print(f"  ⚠️  Request error for {uid}: {e}. Skipping.")
+                        # dump raw bytes securely mapping to mongo collection
+                        try:
+                            enc_img = base64.b64encode(res.content).decode('utf-8')
+                            mg_col.update_one(
+                                {"uid": uid},
+                                {"$set": {"uid": uid, "image_data": enc_img}},
+                                upsert=True
+                            )
+                        except Exception as e:
+                            print(f"mongo fail -> {e}")
 
-    # ── Close connections ──────────────────────────────────────────────────
-    if db_connection.is_connected():
-        cursor.close()
-        db_connection.close()
-        print("\n🔌 MySQL connection closed.")
+                    elif res.status_code == 404:
+                        # soft fail, setup minimal records over sql
+                        try:
+                            sql_cur.execute("""
+                                INSERT INTO users (uid, name, elo_rating, is_online)
+                                VALUES (%s, %s, %s, %s)
+                                ON DUPLICATE KEY UPDATE name = VALUES(name)
+                            """, (uid, nm, 1200, False))
+                            db_conn.commit()
+                            print(f"no pfp resolving for {nm}, writing stubbed baseline")
+                        except mysql.connector.Error as err:
+                            print(f"sql stub fail -> {err}")
+                    else:
+                        pass # unhandled http rejects skipped directly
+                        
+                except Exception:
+                    print(f"timeout scraping record {uid}")
 
-    mongo_client.close()
-    print("🔌 MongoDB connection closed.")
-    print("\n✅ Harvester complete.")
+    # cycle thru datasets
+    scrape_file(csv_path_1, is_ta_list=False)
+    scrape_file(csv_path_2, is_ta_list=True)
 
+    # teardown routines
+    if db_conn.is_connected():
+        sql_cur.close()
+        db_conn.close()
+        print("\nmysql tore down correctly")
+
+    mg_conn.close()
+    print("mongodb tore down correctly")
+    print("harvest routine finalized")
 
 if __name__ == "__main__":
-    csv_path = os.path.join(current_dir, 'batch_data.csv')
-    harvest_images(csv_path)
+    csv_1 = os.path.join(cur_dir, 'batch_data.csv')
+    csv_2 = os.path.join(cur_dir, 'ta_data.csv')
+    start_harvest(csv_1, csv_2)
