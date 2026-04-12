@@ -106,34 +106,39 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // injects session data visually into the upper top UI
-    function prep_headers() {
-        const auth_elo = sessionStorage.getItem("arena_auth_elo");
-        const rnks = check_rank(parseInt(auth_elo || "0"));
+    function prep_headers(currentElo = null) {
+        const eloToUse = currentElo || sessionStorage.getItem("arena_auth_elo");
+        const rnks = check_rank(parseInt(eloToUse || "0"));
 
         document.getElementById('hdr-initials').textContent = get_initials(auth_user);
         document.getElementById('op-name').textContent = auth_user.replaceAll('_', ' ').toUpperCase();
         
-        if (auth_elo) {
-            document.getElementById('op-elo').textContent = `${auth_elo} ELO`;
-            document.getElementById('hdr-elo').textContent = `${auth_elo} ELO`;
+        if (eloToUse) {
+            document.getElementById('op-elo').textContent = `${eloToUse} ELO`;
+            document.getElementById('hdr-elo').textContent = `${eloToUse} ELO`;
             document.getElementById('hdr-rank').textContent = rnks.name;
+            // Keep sessionStorage updated for other pages
+            sessionStorage.setItem("arena_auth_elo", eloToUse);
         }
     }
 
     // pings backend api periodically to gather updated competitor profiles
     function ping_data() {
-        fetch('http://localhost:5001/api/players', { credentials: 'include' })
-            .then(res => {
-                if (!res.ok) throw new Error(`server crash code: ${res.status}`);
-                return res.json();
-            })
+        fetch('http://localhost:5001/api/players', { credentials: 'include', cache: 'no-store' })
+            .then(res => res.json())
             .then(dt => {
                 global_players = dt.players || [];
+                
+                // Find your own record in the live data
+                const me = global_players.find(p => p.uid === auth_uid);
+                if (me) {
+                    prep_headers(me.elo_rating); // Update header/sidebar with live ELO
+                }
+                
                 draw_grid();
             })
             .catch(er => {
                 console.warn("api pipe unavailable:", er);
-                global_players = [];
                 draw_grid();
             });
     }

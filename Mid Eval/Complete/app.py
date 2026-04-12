@@ -12,11 +12,14 @@ from dotenv import load_dotenv
 import uuid
 from fastapi import WebSocket, WebSocketDisconnect
 from engine import TicTacToeEngine
+from fastapi.staticfiles import StaticFiles
 
 # load up env vars like db passwords and uris
 load_dotenv()
 
 app = FastAPI()
+
+app.mount("/Frontend", StaticFiles(directory="Frontend"), name="frontend")
 
 # we need this to securely manage our user sessions instead of bare cookies
 app.add_middleware(SessionMiddleware, secret_key="some_random_secret_string")
@@ -24,7 +27,7 @@ app.add_middleware(SessionMiddleware, secret_key="some_random_secret_string")
 # throw on some cors so our frontend can actually talk to us without browser errors
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], 
+    allow_origins=["http://127.0.0.1:5001", "http://localhost:5001"], # Must be specific for credentials
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -205,9 +208,42 @@ def get_ldrbd():
 
 
 
+@app.get("/api/match-history")
+async def get_match_history(request: Request):
+    uid = request.session.get("uid")
+    if not uid:
+        return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
 
-
-
+    try:
+        conn = get_sql()
+        cursor = conn.cursor(dictionary=True)
+        
+        # Use LEFT JOIN to prevent missing user data from hiding match records
+        query = """
+            SELECT m.*, u1.name as p1_name, u2.name as p2_name 
+            FROM match_history m
+            LEFT JOIN users u1 ON m.player1_uid = u1.uid
+            LEFT JOIN users u2 ON m.player2_uid = u2.uid
+            WHERE m.player1_uid = %s OR m.player2_uid = %s
+            ORDER BY m.played_at DESC
+        """
+        cursor.execute(query, (uid, uid))
+        history_list = cursor.fetchall()
+        
+        # Ensure MySQL datetime objects are JSON serializable to prevent 500 errors
+        for match in history_list:
+            if 'played_at' in match and match['played_at']:
+                match['played_at'] = match['played_at'].isoformat()
+        
+        cursor.close()
+        conn.close()
+        
+        # Return both the match list and the current user's ID for frontend logic
+        return {"matches": history_list, "current_user_id": uid}
+        
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+    
 
 # -- websocket state --
 
