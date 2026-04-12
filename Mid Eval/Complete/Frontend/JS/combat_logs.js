@@ -1,8 +1,5 @@
-// battle_log.js
-
 document.addEventListener('DOMContentLoaded', () => {
 
-    // 1. Auth Guard & Setup
     const loggedInUser = sessionStorage.getItem("arena_auth_user");
     const loggedInUid  = sessionStorage.getItem("arena_auth_uid");
 
@@ -21,7 +18,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('hdr-rank').innerText = getRankName(storedElo);
     }
 
-    // Sidebar Toggle
     const sidebar = document.getElementById('sidebar');
     const mainContent = document.getElementById('main-content');
     document.getElementById('sidebar-toggle').addEventListener('click', () => {
@@ -33,7 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Logout
+    // THE DISCONNECT BUTTON LOGIC
     document.getElementById('btn-logout').addEventListener('click', async (e) => {
         e.preventDefault();
         try {
@@ -48,7 +44,6 @@ document.addEventListener('DOMContentLoaded', () => {
         window.location.href = 'login.html';
     });
 
-    // 2. DOM Elements
     const logsContainer = document.getElementById('match-logs-container');
     const templateLog   = document.getElementById('template-log-entry');
     const templateEmpty = document.getElementById('template-empty-state');
@@ -60,29 +55,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const statNetElo       = document.getElementById('stat-net-elo');
     const widgetCombatScore= document.getElementById('widget-combat-score');
 
-    // Pagination DOM
     const btnPrev = document.getElementById('btn-prev');
     const btnNext = document.getElementById('btn-next');
     const pgInfo = document.getElementById('pg-info');
     const pgInd = document.getElementById('pg-ind');
 
-    // 3. State Management
     let globalMatchData = [];
     let currentFilteredData = [];
-    let currentFilter = 'all'; // can be 'all', 'win', 'loss'
+    let currentFilter = 'all'; 
     let searchQuery = '';
     
-    // Pagination state
     let currentPage = 1;
     const ITEMS_PER_PAGE = 10;
 
-    // Search Bar Listener
     document.getElementById('log-search').addEventListener('input', (e) => {
         searchQuery = e.target.value.toLowerCase();
         applyFiltersAndRender();
     });
 
-    // Filter Buttons Listener
     const btnFilterAll = document.getElementById('btn-filter-all');
     const btnFilterWins = document.getElementById('btn-filter-wins');
     const btnFilterLosses = document.getElementById('btn-filter-losses');
@@ -112,7 +102,6 @@ document.addEventListener('DOMContentLoaded', () => {
         applyFiltersAndRender();
     });
 
-    // Pagination Listeners
     btnNext.addEventListener('click', () => {
         const totalPages = Math.ceil(currentFilteredData.length / ITEMS_PER_PAGE);
         if (currentPage < totalPages) {
@@ -128,7 +117,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // 4. Helper Functions
     function getInitials(name) {
         if (!name) return "??";
         const parts = name.trim().split(/[_\s]+/);
@@ -152,11 +140,9 @@ document.addEventListener('DOMContentLoaded', () => {
         return "Bronze I";
     }
 
-    // 5. Fetch Data
-
     async function fetchCombatLogs() {
         try {
-            const response = await fetch('http://localhost:5001/api/match-history', { credentials: 'include' });
+            const response = await fetch(`http://localhost:5001/api/match-history/${loggedInUid}`, { credentials: 'include' });
             const data = await response.json();
 
             if (data.matches) {
@@ -167,7 +153,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const isDraw = m.winner_uid === null && !m.forfeit;
 
                     return {
-                        timestamp: m.played_at, // MUST match the key from app.py/MySQL
+                        timestamp: m.played_at, 
                         result: isDraw ? 'draw' : (isWin ? 'win' : 'loss'),
                         opponent_name: (m.player1_uid === serverUid ? m.p2_name : m.p1_name) || "Unknown",
                         opponent_rank: "OPPONENT", 
@@ -185,23 +171,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // 6. Filtering Logic
     function applyFiltersAndRender() {
         currentFilteredData = globalMatchData.filter(match => {
-            // 1. Check Win/Loss Filter
             const passesFilter = (currentFilter === 'all') || (match.result === currentFilter);
-            // 2. Check Search Bar
             const passesSearch = match.opponent_name.toLowerCase().includes(searchQuery);
-            
             return passesFilter && passesSearch;
         });
 
-        // Reset to page 1 whenever a filter or search changes
         currentPage = 1; 
         renderLogs();
     }
 
-    // 7. Calculate Top Stats (Always uses full globalMatchData)
     function renderStats(matches) {
         if (!matches || matches.length === 0) return;
 
@@ -234,25 +214,21 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // 8. Draw the Table with Pagination
     function renderLogs() {
         logsContainer.innerHTML = ''; 
 
         const total = currentFilteredData.length;
         const totalPages = Math.max(1, Math.ceil(total / ITEMS_PER_PAGE));
         
-        // Calculate slicing indices for pagination
         const startIdx = (currentPage - 1) * ITEMS_PER_PAGE;
         const endIdx = Math.min(startIdx + ITEMS_PER_PAGE, total);
         const pageData = currentFilteredData.slice(startIdx, endIdx);
 
-        // Update Pagination UI
         pgInfo.innerText = `Showing ${total > 0 ? startIdx + 1 : 0} to ${endIdx} of ${total} records`;
         pgInd.innerText = `Page ${currentPage.toString().padStart(2, '0')} / ${totalPages.toString().padStart(2, '0')}`;
         btnPrev.disabled = currentPage === 1;
         btnNext.disabled = currentPage === totalPages;
 
-        // Draw empty state if no matches pass the filter
         if (pageData.length === 0) {
             const emptyClone = templateEmpty.content.cloneNode(true);
             logsContainer.appendChild(emptyClone);
@@ -261,7 +237,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const fragment = document.createDocumentFragment();
 
-        // Loop through only the current page of data
         pageData.forEach(match => {
             const isWin = match.result === 'win';
             const logClone = templateLog.content.cloneNode(true);
@@ -282,6 +257,40 @@ document.addEventListener('DOMContentLoaded', () => {
         logsContainer.appendChild(fragment);
     }
 
-    // Fetch data to kick off the page
     fetchCombatLogs();
+
+    // ==========================================
+    // COMBAT LOGS WEBSOCKET CONNECTION (Fixes the Offline bug!)
+    // ==========================================
+    function connectLobbySocket() {
+        const lobbySocket = new WebSocket(`ws://localhost:5001/ws/lobby/${loggedInUid}`);
+        
+        lobbySocket.onopen = () => {
+            console.log("Combat Logs socket connected. User is ONLINE.");
+        };
+
+        lobbySocket.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            
+            if (data.type === "challenge_received") {
+                const accept = confirm(`SYSTEM PRIORITY: INCOMING CHALLENGE FROM OPERATOR ${data.from_uid}!\n\nAccept match?`);
+                lobbySocket.send(JSON.stringify({ type: "challenge_response", from_uid: data.from_uid, accepted: accept }));
+                if (accept) { alert("MATCH ACCEPTED. STANDBY FOR ROUTING..."); }
+            }
+
+            if (data.type === "challenge_declined") {
+                alert("CHALLENGE DECLINED: THE TARGET OPERATOR REJECTED YOUR MATCH.");
+            }
+
+            if (data.type === "match_start") {
+                window.location.href = `match_arena.html?room=${data.room_id}&symbol=${data.symbol}`;
+            }
+        };
+
+        lobbySocket.onclose = () => {
+            setTimeout(connectLobbySocket, 2000);
+        };
+    }
+
+    connectLobbySocket();
 });
