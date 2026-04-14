@@ -493,3 +493,78 @@ button, select, input { font-family: inherit; }
 @media (min-width: 1280px) {
     .player-grid { grid-template-columns: repeat(4, 1fr); }
 }
+/* ========================================== */
+/* CUSTOM MODAL SYSTEM                        */
+/* ========================================== */
+
+.modal-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(8px);
+    z-index: 9999;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 1rem;
+}
+
+.custom-modal {
+    width: 100%;
+    max-width: 650px;
+    background-color: #111111;
+    background-image: 
+        linear-gradient(rgba(173, 198, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(173, 198, 255, 0.03) 1px, transparent 1px);
+    background-size: 30px 30px;
+    border: 1px solid rgba(173, 198, 255, 0.1);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    border-radius: 0.25rem;
+    overflow: hidden;
+    animation: modalPop 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalPop {
+    0% { transform: scale(0.95) translateY(10px); opacity: 0; }
+    100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+.modal-sys-bar {
+    display: flex; align-items: center; padding: 0.75rem 1.5rem;
+    background-color: rgba(173, 198, 255, 0.03);
+    border-bottom: 1px solid rgba(173, 198, 255, 0.05);
+    font-size: 0.65rem; letter-spacing: 0.15em; color: rgba(173, 198, 255, 0.5); text-transform: uppercase;
+}
+.sys-dot { width: 10px; height: 10px; background-color: var(--color-primary); border-radius: 50%; margin-right: 0.75rem; }
+.sys-right { margin-left: auto; color: rgba(173, 198, 255, 0.3); }
+
+.modal-title { font-family: var(--font-header); font-size: 1.5rem; font-weight: 900; font-style: italic; color: #ffffff; padding: 1.5rem 2rem 0.5rem 2rem; text-transform: uppercase; letter-spacing: 1px; }
+.modal-title::after { content: ''; display: block; width: 80px; height: 4px; background-color: var(--color-primary); margin-top: 0.5rem; }
+.modal-subtext { font-family: var(--font-header); font-size: 0.875rem; }
+
+.modal-stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; padding: 1.5rem 2rem; }
+.stats-card-left { background-color: #1a1a1a; border-radius: 0.25rem; padding: 1.5rem; display: flex; align-items: center; gap: 1.5rem; }
+.modal-avatar { width: 4.5rem; height: 4.5rem; background-color: #111; border: 2px solid #333; display: flex; justify-content: center; align-items: center; font-size: 1.5rem; font-weight: 900; color: #666; font-family: var(--font-header);}
+.modal-id-info { display: flex; flex-direction: column; }
+.sub-lbl { font-family: var(--font-header); font-size: 0.65rem; color: #888; letter-spacing: 0.1em; margin-bottom: 0.25rem; text-transform: uppercase; }
+.main-val { font-family: var(--font-header); font-size: 1.25rem; font-weight: 700; color: #fff; }
+.ready-badge { font-family: var(--font-header); display: flex; align-items: center; gap: 0.3rem; margin-top: 0.5rem; font-size: 0.7rem; color: var(--color-secondary); font-weight: 700; letter-spacing: 0.05em; }
+
+.stats-col-right { display: flex; flex-direction: column; gap: 0.75rem; }
+.stat-box { background-color: #242424; padding: 1rem 1.5rem; border-radius: 0.25rem; display: flex; justify-content: space-between; align-items: center; }
+.primary-text { color: var(--color-primary); }
+.sec-text { color: var(--color-secondary); }
+
+.modal-actions { display: flex; gap: 1rem; padding: 0 2rem 2rem 2rem; }
+.btn-modal-accept, .btn-modal-decline { flex: 1; border-radius: 0.25rem; padding: 1.25rem; font-size: 1.25rem; font-weight: 900; font-style: italic; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 0.5rem; transition: all 0.2s; border: none; font-family: var(--font-header); }
+
+.btn-modal-accept { background-color: var(--color-secondary); color: #0b2e1f; }
+.btn-modal-accept:hover { filter: brightness(1.1); transform: scale(1.02); }
+
+.btn-modal-decline { background-color: #242424; color: var(--color-danger); border: 1px solid rgba(255, 84, 81, 0.3); }
+.btn-modal-decline:hover { background-color: rgba(255,84,81,0.1); border-color: var(--color-danger); }
+
+@media (max-width: 600px) {
+    .modal-stats-grid { grid-template-columns: 1fr; }
+    .modal-actions { flex-direction: column; }
+}

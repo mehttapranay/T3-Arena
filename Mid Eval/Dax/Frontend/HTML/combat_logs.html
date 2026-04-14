@@ -3,13 +3,13 @@
 <head>
     <meta charset="utf-8"/>
     <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-    <title>ARENA | Battle Logs</title>
+    <title>ARENA | Combat Logs</title>
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@300;400;500;600;700;900&display=swap" rel="stylesheet"/>
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
     
-    <link rel="stylesheet" href="../CSS/battle_logs.css">
-    <script src="../JS/battle_logs.js" defer></script>
+    <link rel="stylesheet" href="../CSS/combat_logs.css">
+    <script src="../JS/combat_logs.js" defer></script>
 </head>
 <body>
 <header class="top-nav">
@@ -21,7 +21,7 @@
         
         <div class="search-box">
             <span class="material-symbols-outlined">search</span>
-            <input id="log-search" class="search-input font-header" placeholder="SEARCH_OPPONENT..." type="text"/>
+            <input id="log-search" class="search-input font-header" placeholder="SEARCH_OPPONENT" type="text"/>
         </div>
     </div>
 
@@ -52,7 +52,7 @@
         <a class="nav-link" href="leaderboard.html">
             <span class="material-symbols-outlined">leaderboard</span> Leaderboard
         </a>
-        <a class="nav-link active" href="battle_logs.html">
+        <a class="nav-link active" href="combat_logs.html">
             <span class="material-symbols-outlined">folder_zip</span> Combat Logs
         </a>    
         <a id="btn-logout" class="nav-link danger" href="#">
@@ -83,7 +83,6 @@
                     <span class="stat-value font-header" id="stat-total-matches">0</span>
                     <span class="stat-unit font-header text-primary">OPs</span>
                 </div>
-                <div class="stat-bar-bg"><div class="stat-bar-fill bg-primary w-75"></div></div>
             </div>
             
             <div class="stat-card border-secondary">
@@ -156,7 +155,6 @@
                         <span class="widget-stat-label font-header">OVERALL COMBAT SCORE</span>
                         <span class="widget-stat-number font-header text-secondary" id="widget-combat-score">0</span>
                     </div>
-                    <div class="stat-bar-bg"><div class="stat-bar-fill bg-secondary w-100" style="width: 100%;"></div></div>
                 </div>
             </aside>
 
@@ -169,7 +167,7 @@
         <span class="material-symbols-outlined">sports_esports</span>
         <span>Lobby</span>
     </a>
-    <a class="mobile-link font-header active" href="battle_log.html">
+    <a class="mobile-link font-header active" href="combat_logs.html">
         <span class="material-symbols-outlined">folder_zip</span>
         <span>Logs</span>
     </a>

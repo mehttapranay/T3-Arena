@@ -7,8 +7,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const loggedInUid  = sessionStorage.getItem("arena_auth_uid");
 
     if (!loggedInUser || !loggedInUid) {
-        // window.location.replace("login.html");
-        // return; // Uncomment in production
+        window.location.replace("login.html");
+        return; 
+    }
+
+    // Extract URL Params for WebSocket
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomId = urlParams.get('room');
+    const mySymbol = urlParams.get('symbol'); // "X" or "O"
+
+    if (!roomId || !mySymbol) {
+        alert("Invalid match routing. Returning to lobby.");
+        window.location.href = "lobby_command_center.html";
+        return;
     }
 
     // Set User Profile Data Locally
@@ -42,7 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const liveResponseTime = document.getElementById('live-response-time');
 
     // 3. Match State
-    let isMyTurn = false; // Will be updated by server
+    let isMyTurn = false; 
     let gameActive = true;
     let boardState = ["", "", "", "", "", "", "", "", ""]; 
     
@@ -53,13 +64,12 @@ document.addEventListener('DOMContentLoaded', () => {
     let timerInterval;
 
     // -------------------------------------------------------------
-    // BACKEND: MATCH INITIALIZATION
-    // Fetch opponent data when the page loads
+    // BACKEND: MATCH INITIALIZATION 
     // -------------------------------------------------------------
     async function initializeMatch() {
         try {
-            // Your friend will provide this API route
-            let response = await fetch('http://localhost:5001/api/match_init');
+            // FIX: Now passing the Room ID and User ID in the URL
+            let response = await fetch(`http://localhost:5001/api/match_init/${roomId}/${loggedInUid}`);
             let data = await response.json();
             
             // Populate real opponent data
@@ -100,7 +110,8 @@ document.addEventListener('DOMContentLoaded', () => {
     addLog("SYSTEM: Handshake complete.");
     addLog("ARENA: Awaiting server synchronization.");
 
-    function showToast() {
+    function showToast(message = "ACCESS DENIED: NOT YOUR TURN") {
+        document.getElementById('toast-message').innerText = message;
         toast.classList.remove('hidden');
         setTimeout(() => { toast.classList.add('hidden'); }, 2500); 
     }
@@ -130,111 +141,138 @@ document.addEventListener('DOMContentLoaded', () => {
         lastTurnTime = Date.now();
     }
 
+    // =========================================================================
+    // WEBSOCKET INTEGRATION (Replaces HTTP Polling)
+    // =========================================================================
+    const gameSocket = new WebSocket(`ws://localhost:5001/ws/game/${roomId}/${loggedInUid}`);
+
+    gameSocket.onopen = () => {
+        addLog("ARENA: Server synchronization established.");
+    };
+
+    gameSocket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+
+        // 1. Board updates and turn toggling
+        if (data.type === "board_state" || data.type === "board_update") {
+            updateBoardFromBackend(data.board);
+            setTurnUI(data.turn === mySymbol);
+            
+            if (data.last_move) {
+                const mover = data.last_move.uid === loggedInUid ? "YOU" : "OPPONENT";
+                const sector = (data.last_move.row * 3) + data.last_move.col;
+                addLog(`Move: ${mover} -> Sector [${sector}]`);
+            }
+        }
+
+        // 2. Reject Invalid Moves
+        if (data.type === "move_rejected") {
+            showToast(data.reason.toUpperCase());
+        }
+
+        // 3. Match Complete
+        if (data.type === "game_over") {
+            showEndScreen(data);
+        }
+
+        // Add this anywhere inside your gameSocket.onmessage block to handle incoming draws:
+        if (data.type === "draw_offered") {
+            if (confirm("Opponent has offered a draw. Do you accept?")) {
+                gameSocket.send(JSON.stringify({ type: "accept_draw" }));
+            } else {
+                gameSocket.send(JSON.stringify({ type: "reject_draw" }));
+            }
+        }
+        if (data.type === "draw_rejected") {
+            addLog("SYSTEM: Opponent rejected the draw offer.");
+            showToast("DRAW REJECTED");
+        }
+
+    };
+
+    gameSocket.onclose = () => {
+        if (gameActive) addLog("SYSTEM ERROR: Connection to Arena lost.");
+    };
+
+    // Safely reads Python's 2D array and updates your 1D HTML Grid
+    function updateBoardFromBackend(backendBoard) {
+        let newMoves = 0;
+        for (let row = 0; row < 3; row++) {
+            for (let col = 0; col < 3; col++) {
+                const index = (row * 3) + col;
+                const mark = backendBoard[row][col];
+                
+                if (mark !== "") newMoves++;
+
+                if (boardState[index] !== mark) {
+                    boardState[index] = mark;
+                    const cellEl = cells[index];
+                    if (mark === "X") {
+                        cellEl.innerHTML = `<span class="material-symbols-outlined mark-x">close</span>`;
+                    } else if (mark === "O") {
+                        cellEl.innerHTML = `<span class="material-symbols-outlined mark-o">radio_button_unchecked</span>`;
+                    }
+                }
+            }
+        }
+        
+        // If total moves increased, trigger your UI analytics
+        if (newMoves > moveCount) {
+            updateLiveAnalytics();
+        }
+    }
+
     // -------------------------------------------------------------
-    // BACKEND: SENDING MOVES
+    // SENDING MOVES TO WEBSOCKET
     // -------------------------------------------------------------
     cells.forEach(cell => {
-        cell.addEventListener('click', async (e) => {
+        cell.addEventListener('click', (e) => {
             if (!gameActive) return;
-            const index = e.target.getAttribute('data-index');
+            const index = parseInt(e.currentTarget.getAttribute('data-index'));
 
             if (boardState[index] !== "") return;
-            if (!isMyTurn) { showToast(); return; }
+            if (!isMyTurn) { showToast("ACCESS DENIED: NOT YOUR TURN"); return; }
 
-            // 1. Optimistic UI update (Feels instantly responsive)
-            boardState[index] = "X";
-            e.target.innerHTML = `<span class="material-symbols-outlined mark-x">close</span>`;
-            addLog(`Move: YOU (X) -> Sector [${index}]`);
-            updateLiveAnalytics();
-            setTurnUI(false);
+            // Send move to Python Backend via WebSocket
+            const row = Math.floor(index / 3);
+            const col = index % 3;
 
-            // 2. Send move to Python Backend
-            try {
-                await fetch('http://localhost:5001/api/make_move', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ cell_index: index, player: "X" })
-                });
-            } catch(error) {
-                console.error("Failed to send move to server", error);
-            }
+            gameSocket.send(JSON.stringify({
+                type: "move",
+                row: row,
+                col: col
+            }));
         });
     });
 
-    // -------------------------------------------------------------
-    // BACKEND: SERVER POLLING LOOP (Checks for opponent moves)
-    // -------------------------------------------------------------
-    setInterval(async () => {
-        if (!gameActive) return;
-        
-        try {
-            let response = await fetch('http://localhost:5001/api/game_status');
-            let backendData = await response.json();
-            
-            // 1. Check if game is over
-            if (backendData.game_status === "game_over") {
-                showEndScreen(backendData);
-                return;
-            }
-
-            // 2. Check if opponent made a move 
-            // (Assumes backend sends array like: ["X", "O", "", "", ...])
-            if (backendData.board && JSON.stringify(backendData.board) !== JSON.stringify(boardState)) {
-                updateBoardFromBackend(backendData.board);
-            }
-            
-            // 3. Update Turn Indicator
-            if (backendData.current_turn === loggedInUser && !isMyTurn) {
-                setTurnUI(true);
-            }
-            
-        } catch(e) {
-            // Silently fail if backend is unreachable during dev so it doesn't spam errors
-        }
-    }, 1000);
-
-    // Updates HTML board if opponent moved
-    function updateBoardFromBackend(newBoard) {
-        newBoard.forEach((mark, index) => {
-            if (boardState[index] !== mark) {
-                boardState[index] = mark;
-                if (mark === "O") {
-                    cells[index].innerHTML = `<span class="material-symbols-outlined mark-o">radio_button_unchecked</span>`;
-                    addLog(`Move: OPPONENT (O) -> Sector [${index}]`);
-                    updateLiveAnalytics();
-                } else if (mark === "X") {
-                    cells[index].innerHTML = `<span class="material-symbols-outlined mark-x">close</span>`;
-                }
-            }
-        });
-    }
-
     // =========================================================================
-    // END OF MATCH LOGIC (DYNAMIC - POWERED BY BACKEND JSON)
+    // END OF MATCH LOGIC 
     // =========================================================================
 
     const overlay = document.getElementById('match-result-overlay');
     
-    // Expects JSON from backend containing real ELO math and results
     function showEndScreen(matchData) {
         if (!gameActive) return; 
         gameActive = false; 
         clearInterval(timerInterval); 
 
-        // Extract real data sent by Python server
-        const resultType = matchData.result; // 'victory', 'defeat', or 'draw'
-        const prevElo = matchData.previous_elo || storedElo;
-        const currentElo = matchData.new_elo || prevElo;
-        const eloChange = matchData.elo_change || 0;
-        const totalMoves = matchData.total_moves || moveCount;
-        const timeElapsed = matchData.time_elapsed || liveDurationEl.innerText;
-        const reasonText = matchData.reason || "Match Concluded by Server.";
+        // Map Python WebSocket payload to your UI variables
+        let resultType = "draw";
+        if (matchData.winner === mySymbol) resultType = "victory";
+        else if (matchData.winner && matchData.winner !== "DRAW") resultType = "defeat";
+
+        const prevElo = storedElo;
+        const currentElo = matchData.new_ratings[loggedInUid];
+        const eloChange = currentElo - prevElo;
+        const totalMoves = moveCount;
+        const timeElapsed = liveDurationEl.innerText;
+        const reasonText = matchData.forfeit ? "Opponent Forfeited // Arena Dominance Confirmed" : "Match Concluded by Server.";
 
         let title, systemText, desc, classTheme;
         
         if (resultType === 'victory') {
             classTheme = 'theme-victory';
-            title = 'VICTORY';
+            title = matchData.forfeit ? 'VICTORY (FORFEIT)' : 'VICTORY';
             systemText = 'System_Link_Stable';
             desc = 'Performance rating exceeds regional average.';
         } else if (resultType === 'defeat') {
@@ -283,17 +321,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Buttons Send Backend Requests Instead of Faking It Now
-    document.getElementById('btn-resign').addEventListener('click', async () => {
-        try { await fetch('http://localhost:5001/api/resign', { method: 'POST' }); } catch(e) {}
+    document.getElementById('btn-resign').addEventListener('click', () => {
+        if (gameActive && confirm("Are you sure you want to resign? This will count as a loss.")) {
+            gameSocket.send(JSON.stringify({ type: "resign" }));
+        }
     });
 
-    document.getElementById('btn-offer-draw').addEventListener('click', async () => {
-        try { await fetch('http://localhost:5001/api/offer_draw', { method: 'POST' }); } catch(e) {}
+    document.getElementById('btn-offer-draw').addEventListener('click', () => {
+        if (gameActive) {
+            gameSocket.send(JSON.stringify({ type: "offer_draw" }));
+            addLog("SYSTEM: Draw offer transmitted.");
+        }
     });
 
     // Overlay Navigation Links
     document.getElementById('btn-return-lobby').addEventListener('click', () => { window.location.href = "lobby_command_center.html"; });
     document.getElementById('btn-view-leaderboard').addEventListener('click', () => { window.location.href = "leaderboard.html"; });
-    document.getElementById('btn-rematch').addEventListener('click', () => { window.location.reload(); });
+    document.getElementById('btn-rematch').addEventListener('click', () => { window.location.href = "lobby_command_center.html"; });
 
 });
