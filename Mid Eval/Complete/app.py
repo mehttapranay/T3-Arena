@@ -56,7 +56,7 @@ class MatchHistory(Base):
     player1_elo_after = Column(Integer)
     player2_elo_after = Column(Integer)
     forfeit = Column(Boolean, default=False)
-    played_at = Column(DateTime, default=datetime.utcnow)
+    played_at = Column(DateTime, default=datetime.now)
 
 # Safety check: SQLAlchemy creates only missing tables
 Base.metadata.create_all(bind=engine)
@@ -186,7 +186,7 @@ def get_match_history(uid: str, db: Session = Depends(get_db)):
 
         # 3. Format payload to match what combat_logs.js expectations
         results.append({
-            "played_at": m.played_at.isoformat(),
+            "played_at": m.played_at.strftime("%Y-%m-%d %H:%M:%S"), 
             "winner_uid": m.winner_uid,
             "player1_uid": m.player1_uid,
             "player2_uid": m.player2_uid,
