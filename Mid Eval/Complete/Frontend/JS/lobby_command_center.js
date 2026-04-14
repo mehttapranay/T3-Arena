@@ -213,8 +213,8 @@ document.addEventListener('DOMContentLoaded', () => {
             switch (srt_md) {
                 case 'elo-desc':  return b.elo_rating - a.elo_rating;
                 case 'elo-asc':   return a.elo_rating - b.elo_rating;
-                case 'win-desc':  return b.winrate - a.winrate;
-                case 'win-asc':   return a.winrate - b.winrate;
+                case 'name-asc':  return a.name.localeCompare(b.name);
+                case 'name-desc': return b.name.localeCompare(a.name);
                 default:          return 0;
             }
         });
