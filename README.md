@@ -15,9 +15,9 @@
 <u>* NOTE:</u> Make sure that you create both `.env` files before running the codes.<br>
 
 1) <b>Terminal:</b> uv run Fetch_data/harvester.py (To fetch data from IIIT server to MySQL)
-2) <b>Terminal 1:</b> python3 -m http.server 8000
+2) <b>Terminal 1:</b> ngrok http 5001
 3) <b>Terminal 2:</b> uv run app.py
-4) <b>In Browser:</b> http://localhost:8000/Frontend/HTML/login.html
+4) <b>In Browser:</b> `https://your-ngrok-url-here.ngrok-free.dev/Frontend/HTML/login.html`
 </pre>
 
 ---
@@ -42,6 +42,9 @@ MONGO_URI=mongodb://localhost:27017
 
 # FastAPI Security
 SESSION_SECRET=a_very_long_random_string_here_for_security
+
+# Ngrok URL
+ALLOWED_ORIGINS=http://localhost:5001,http://127.0.0.1:5001,https://your-ngrok-url-here.ngrok-free.dev
 </pre>
 
 ---
