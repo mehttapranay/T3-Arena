@@ -50,10 +50,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
         console.log('image gathered safely. routing to backend.');
 
+        // FIX: Dynamic API Base to support both Localhost and Ngrok on Mobile
+        const apiBase = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+            ? 'http://localhost:5001' 
+            : window.location.origin;
+
         // send parsed picture text to standard verification route
-        fetch('http://localhost:5001/login', {
+        fetch(apiBase + '/login', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'ngrok-skip-browser-warning': 'true'  // <--- THIS IS THE ONLY CHANGE
+            },
             body: JSON.stringify({ image: base64_image }),
             credentials: 'include',
         })
@@ -105,5 +113,4 @@ document.addEventListener('DOMContentLoaded', () => {
         captured_frame.classList.add('hidden');
         video.classList.remove('hidden');
     }
-
 });

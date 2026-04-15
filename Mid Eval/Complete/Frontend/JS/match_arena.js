@@ -81,7 +81,20 @@ document.addEventListener('DOMContentLoaded', () => {
     // -------------------------------------------------------------
     async function initializeMatch() {
         try {
-            let response = await fetch(`http://localhost:5001/api/match_init/${roomId}/${loggedInUid}`);
+            // FIX: Dynamic API Base to support both Localhost and Ngrok
+            const apiBase = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+                ? 'http://localhost:5001' 
+                : window.location.origin;
+
+            // FIX: Added explicit Ngrok bypass headers so the data isn't blocked
+            let response = await fetch(`${apiBase}/api/match_init/${roomId}/${loggedInUid}`, {
+                method: 'GET',
+                headers: {
+                    'ngrok-skip-browser-warning': 'true',
+                    'Content-Type': 'application/json'
+                },
+                credentials: 'include'
+            });
             
             // SECURITY CHECK: Throw an error if the route 404s
             if (!response.ok) throw new Error("Match initialization failed."); 
@@ -164,7 +177,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // =========================================================================
     // WEBSOCKET INTEGRATION
     // =========================================================================
-    const gameSocket = new WebSocket(`ws://localhost:5001/ws/game/${roomId}/${loggedInUid}`);
+    // FIX: Dynamic WebSocket routing for both Ngrok and Localhost
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+        ? 'localhost:5001' 
+        : window.location.host;
+
+    const gameSocket = new WebSocket(`${wsProtocol}//${wsHost}/ws/game/${roomId}/${loggedInUid}`);
 
     gameSocket.onopen = () => {
         addLog("ARENA: Server synchronization established.");

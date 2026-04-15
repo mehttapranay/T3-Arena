@@ -71,7 +71,9 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-logout').addEventListener('click', async (e) => {
         e.preventDefault();
         try {
-            await fetch('http://localhost:5001/logout', {
+            // FIX: Dynamic API Base for Logout
+            const apiBase = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://localhost:5001' : window.location.origin;
+            await fetch(`${apiBase}/logout`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ uid: loggedInUid }),
@@ -182,7 +184,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function fetchCombatLogs() {
         try {
-            const response = await fetch(`http://localhost:5001/api/match-history/${loggedInUid}`, { credentials: 'include' });
+            // FIX: Dynamic API Base for Fetching Logs
+            const apiBase = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://localhost:5001' : window.location.origin;
+            const response = await fetch(`${apiBase}/api/match-history/${loggedInUid}`, { credentials: 'include' });
             const data = await response.json();
 
             if (data.matches) {
@@ -315,7 +319,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // COMBAT LOGS WEBSOCKET CONNECTION
     // ==========================================
     function connectLobbySocket() {
-        const lobbySocket = new WebSocket(`ws://localhost:5001/ws/lobby/${loggedInUid}`);
+        // FIX: Dynamic WebSocket routing
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'localhost:5001' : window.location.host;
+        const lobbySocket = new WebSocket(`${wsProtocol}//${wsHost}/ws/lobby/${loggedInUid}`);
         
         lobbySocket.onopen = () => {
             console.log("Combat Logs socket connected. User is ONLINE.");

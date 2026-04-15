@@ -7,7 +7,8 @@ import pymongo
 import uvicorn
 from datetime import datetime
 
-from fastapi import FastAPI, Request, Depends, WebSocket
+# RESTORED: WebSocketDisconnect
+from fastapi import FastAPI, Request, Depends, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -25,18 +26,16 @@ from engine import TicTacToeEngine
 load_dotenv()
 
 # --- STANDALONE DATABASE CONFIGURATION ---
-# We use the same encoding logic to handle your @ password
 raw_password = os.getenv('DB_PASSWORD', '')
 encoded_password = urllib.parse.quote(raw_password)
 
 DB_URL = f"mysql+mysqlconnector://{os.getenv('DB_USER')}:{encoded_password}@{os.getenv('DB_HOST', 'localhost')}/{os.getenv('DB_NAME', 'arena_db')}"
 
-# Configuration matching the project statement requirements
 engine = create_engine(DB_URL, pool_size=5, max_overflow=10)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-# --- STANDALONE MODELS (Independent Copy) ---
+# --- STANDALONE MODELS ---
 class User(Base):
     __tablename__ = "users"
     uid = Column(String(50), primary_key=True)
@@ -58,10 +57,8 @@ class MatchHistory(Base):
     forfeit = Column(Boolean, default=False)
     played_at = Column(DateTime, default=datetime.now)
 
-# Safety check: SQLAlchemy creates only missing tables
 Base.metadata.create_all(bind=engine)
 
-# Dependency to get DB session
 def get_db():
     db = SessionLocal()
     try:
@@ -69,14 +66,18 @@ def get_db():
     finally:
         db.close()
 
-
-# --- APP INITIALIZATION ---
+# --- APP INITIALIZATION & CORS ---
 app = FastAPI()
 app.mount("/Frontend", StaticFiles(directory="Frontend"), name="frontend")
 app.add_middleware(SessionMiddleware, secret_key=os.getenv("SESSION_SECRET", "super-secret-key"))
+
+# NGROK FIX MERGED: Kept your localhost bases, but explicitly added the Ngrok URL
+origins_env = os.getenv("ALLOWED_ORIGINS", "http://localhost:5001,http://127.0.0.1:5001,https://dole-outfit-expulsion.ngrok-free.dev")
+allowed_origins = [origin.strip() for origin in origins_env.split(",")]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Tighten this for production
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -84,7 +85,6 @@ app.add_middleware(
 
 # --- UTILITY FUNCTIONS ---
 def get_mg_imgs():
-    """Fetches profile images from MongoDB for facial recognition."""
     db_dt = {}
     try:
         cn = pymongo.MongoClient(os.getenv("MONGO_URI", "mongodb://localhost:27017"))
@@ -99,12 +99,10 @@ def get_mg_imgs():
     return db_dt
 
 def get_player_data(db: Session, include_rank: bool = False):
-    """Refactored logic to fetch leaderboard data via SQLAlchemy."""
     users = db.query(User).order_by(User.elo_rating.desc()).all()
     results = []
     
     for i, u in enumerate(users):
-        # Query match counts using the relationship logic
         total = db.query(MatchHistory).filter(or_(MatchHistory.player1_uid == u.uid, MatchHistory.player2_uid == u.uid)).count()
         wins = db.query(MatchHistory).filter(MatchHistory.winner_uid == u.uid).count()
         
@@ -118,9 +116,9 @@ def get_player_data(db: Session, include_rank: bool = False):
     return results
 
 # --- API ROUTES ---
-
 @app.post('/login')
 async def handle_login(req: Request, db: Session = Depends(get_db)):
+    # RESTORED: Your exact original logic structure.
     data = await req.json()
     b64_img = data.get('image')
     if not b64_img:
@@ -171,20 +169,16 @@ def get_leaderboard(db: Session = Depends(get_db)):
 
 @app.get('/api/match-history/{uid}')
 def get_match_history(uid: str, db: Session = Depends(get_db)):
-    # 1. Fetch matches where the user was either Player 1 or Player 2
-    # Ordered by most recent first
     matches = db.query(MatchHistory).filter(
         or_(MatchHistory.player1_uid == uid, MatchHistory.player2_uid == uid)
     ).order_by(MatchHistory.played_at.desc()).all()
 
     results = []
     for m in matches:
-        # 2. Identify the opponent to fetch their name for the UI
         opp_uid = m.player2_uid if m.player1_uid == uid else m.player1_uid
         opp_user = db.query(User).filter(User.uid == opp_uid).first()
         opp_name = opp_user.name if opp_user else "Unknown Operator"
 
-        # 3. Format payload to match what combat_logs.js expectations
         results.append({
             "played_at": m.played_at.strftime("%Y-%m-%d %H:%M:%S"), 
             "winner_uid": m.winner_uid,
@@ -203,37 +197,31 @@ def get_match_history(uid: str, db: Session = Depends(get_db)):
 
 @app.get('/api/match_init/{rid}/{uid}')
 def init_match(rid: str, uid: str, db: Session = Depends(get_db)):
-    # 1. Ensure the room exists in active memory
     room = game_mgr.rooms.get(rid)
     if not room:
         return JSONResponse(status_code=404, content={"error": "Match room not found on server."})
 
-    # 2. Identify the opponent's UID
     players = room["players"]
     opp_uid = players[0] if players[1] == uid else players[1]
 
-    # 3. Fetch both users from the database
     my_user = db.query(User).filter(User.uid == uid).first()
     opp_user = db.query(User).filter(User.uid == opp_uid).first()
 
-    # Helper function to calculate win rate on the fly
     def calc_winrate(user_id):
         total = db.query(MatchHistory).filter(or_(MatchHistory.player1_uid == user_id, MatchHistory.player2_uid == user_id)).count()
         wins = db.query(MatchHistory).filter(MatchHistory.winner_uid == user_id).count()
         return round((wins / total) * 100, 1) if total > 0 else 0.0
 
-    # 4. Return the exact payload the frontend expects
     return {
         "opponent_name": opp_user.name if opp_user else f"OPERATOR {opp_uid}",
         "opponent_elo": opp_user.elo_rating if opp_user else 1200,
         "opponent_winrate": calc_winrate(opp_uid),
-        "opponent_region": "GLOBAL", # Hardcoded placeholder for UI
+        "opponent_region": "GLOBAL", 
         "my_winrate": calc_winrate(uid),
-        "my_streak": "-"             # Hardcoded placeholder for UI
+        "my_streak": "-"             
     }
 
 # --- WEBSOCKET MANAGERS ---
-
 class LobbyManager:
     def __init__(self):
         self.connections: dict[str, WebSocket] = {}
@@ -315,7 +303,6 @@ async def finalize_match(rid: str, forfeit_winner: str = None):
         rx_new, ro_new = eng.get_match_results(ux.elo_rating, uo.elo_rating)
         win_uid = eng.players[eng.winner] if eng.winner in ["X", "O"] else None
         
-        # Persistence
         match = MatchHistory(
             player1_uid=uid_x, player2_uid=uid_o, winner_uid=win_uid,
             player1_elo_before=ux.elo_rating, player2_elo_before=uo.elo_rating,
@@ -335,7 +322,6 @@ async def finalize_match(rid: str, forfeit_winner: str = None):
     game_mgr.rooms.pop(rid, None)
 
 # --- WEBSOCKET ENDPOINTS ---
-
 @app.websocket("/ws/lobby/{uid}")
 async def ws_lobby(ws: WebSocket, uid: str):
     await lobby_mgr.connect(uid, ws)
@@ -355,18 +341,16 @@ async def ws_lobby(ws: WebSocket, uid: str):
                 target = msg.get("target_uid")
                 pending_challenges[uid] = target
                 
-                # --- NEW STAT FETCHING LOGIC ---
+                # MERGED: Kept the new Lobby stats logic you requested
                 with SessionLocal() as db:
                     challenger = db.query(User).filter(User.uid == uid).first()
                     c_name = challenger.name if challenger else f"OPERATOR {uid}"
                     c_elo = challenger.elo_rating if challenger else 1200
                     
-                    # Calculate win rate on the fly
                     total = db.query(MatchHistory).filter(or_(MatchHistory.player1_uid == uid, MatchHistory.player2_uid == uid)).count()
                     wins = db.query(MatchHistory).filter(MatchHistory.winner_uid == uid).count()
                     c_winrate = round((wins / total) * 100, 1) if total > 0 else 0.0
 
-                # Add the stats to the broadcast payload
                 await lobby_mgr.send_to(target, {
                     "type": "challenge_received", 
                     "from_uid": uid,
@@ -387,19 +371,18 @@ async def ws_lobby(ws: WebSocket, uid: str):
                     await lobby_mgr.send_to(challenger, {"type": "match_start", "room_id": rid, "symbol": "X", "opponent_uid": uid})
                     await lobby_mgr.send_to(uid, {"type": "match_start", "room_id": rid, "symbol": "O", "opponent_uid": challenger})
                 elif not accepted:
-                    # FIX: If declined, explicitly notify the challenger so their UI can reset
                     await lobby_mgr.send_to(challenger, {"type": "challenge_declined"})
                     
                 pending_challenges.pop(challenger, None)
                 
-            # FIX: Handle the sender hitting "Dismiss" before the target answers
             elif mtype == "cancel_challenge":
                 target = msg.get("target_uid")
                 if pending_challenges.get(uid) == target:
                     pending_challenges.pop(uid, None)
-                    # Notify the target to close their incoming challenge modal
                     await lobby_mgr.send_to(target, {"type": "challenge_cancelled"})
-    except:
+    
+    # RESTORED: Your original disconnect exception
+    except WebSocketDisconnect:
         await lobby_mgr.handle_disconnect(uid)
 
 @app.websocket("/ws/game/{rid}/{uid}")
@@ -438,9 +421,22 @@ async def ws_game(ws: WebSocket, rid: str, uid: str):
                 other_uid = [p for p in room["players"] if p != uid][0]
                 await finalize_match(rid, forfeit_winner=other_uid)
                 
+            # RESTORED: Your original draw logic
+            elif mtype == "offer_draw":
+                other_uid = [p for p in room["players"] if p != uid][0]
+                if other_uid in room["connections"]:
+                    await room["connections"][other_uid].send_json({"type": "draw_offered"})
                     
-    except Exception as e:
-        print(f"WebSocket Game Error: {e}") # This will now print the exact crash reason!
+            elif mtype == "accept_draw":
+                eng.winner = "DRAW"
+                await finalize_match(rid)
+                
+            elif mtype == "reject_draw":
+                other_uid = [p for p in room["players"] if p != uid][0]
+                if other_uid in room["connections"]:
+                    await room["connections"][other_uid].send_json({"type": "draw_rejected"})
+                    
+    except WebSocketDisconnect:
         if rid in game_mgr.rooms and not eng.winner:
             other = [p for p in room["players"] if p != uid][0]
             try:

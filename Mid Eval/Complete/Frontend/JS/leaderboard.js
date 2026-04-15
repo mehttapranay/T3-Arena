@@ -106,7 +106,9 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-logout').addEventListener('click', async (e) => {
         e.preventDefault();
         try {
-            await fetch('http://localhost:5001/logout', {
+            // FIX: Dynamic API Base for Logout
+            const apiBase = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://localhost:5001' : window.location.origin;
+            await fetch(`${apiBase}/logout`, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ uid: auth_uid }), credentials: 'include'
             });
@@ -150,7 +152,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function ping_data() {
         const cacheBuster = Date.now();
-        fetch(`http://localhost:5001/api/leaderboard?t=${cacheBuster}`, { credentials: 'include' })
+        // FIX: Dynamic API Base for Ping
+        const apiBase = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://localhost:5001' : window.location.origin;
+        fetch(`${apiBase}/api/leaderboard?t=${cacheBuster}`, { credentials: 'include' })
             .then(res => res.json())
             .then(data => {
                 gbl_data = rank_data(data.players || []);
@@ -269,7 +273,10 @@ document.addEventListener('DOMContentLoaded', () => {
     btn_prev.addEventListener('click', () => { if (cur_pg > 1) { cur_pg--; draw_table(); } });
 
     function connectLobbySocket() {
-        lobbySocket = new WebSocket(`ws://localhost:5001/ws/lobby/${auth_uid}`);
+        // FIX: Dynamic WebSocket routing
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'localhost:5001' : window.location.host;
+        lobbySocket = new WebSocket(`${wsProtocol}//${wsHost}/ws/lobby/${auth_uid}`);
         
         lobbySocket.onopen = () => { ping_data(); };
 
