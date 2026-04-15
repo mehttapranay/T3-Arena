@@ -49,36 +49,10 @@ ALLOWED_ORIGINS=http://localhost:5001,http://127.0.0.1:5001,https://your-ngrok-u
 
 ---
 
-### Create Data Bases:
+### Create Data Base in MySQL:
 <pre>
 1) CREATE DATABASE IF NOT EXISTS arena_db;
-
-2) USE arena_db;
-
-3) CREATE TABLE IF NOT EXISTS users (
-    uid         VARCHAR(50)  PRIMARY KEY,
-    name        VARCHAR(255) NOT NULL,
-    elo_rating  INT          DEFAULT 1200,
-    is_online   BOOLEAN      DEFAULT FALSE,
-    is_fighting BOOLEAN      DEFAULT FALSE   -- needed for lobby "FIGHTING" status
-    );
-
-4) CREATE TABLE IF NOT EXISTS match_history (
-    id                  INT AUTO_INCREMENT PRIMARY KEY,
-    player1_uid         VARCHAR(50) NOT NULL,
-    player2_uid         VARCHAR(50) NOT NULL,
-    winner_uid          VARCHAR(50) DEFAULT NULL,   -- NULL = draw
-    player1_elo_before  INT         NOT NULL,
-    player2_elo_before  INT         NOT NULL,
-    player1_elo_after   INT         NOT NULL,
-    player2_elo_after   INT         NOT NULL,
-    forfeit             BOOLEAN     DEFAULT FALSE,
-    played_at           TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (player1_uid) REFERENCES users(uid),
-    FOREIGN KEY (player2_uid) REFERENCES users(uid)
-    );
-
-5) exit;
+2) exit;
 </pre>
 
 ---
