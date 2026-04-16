@@ -41,61 +41,28 @@ document.addEventListener('DOMContentLoaded', () => {
             ? 'http://localhost:5001' 
             : window.location.origin;
 
-        // unique tag so we can poll for this specific attempt
-        const att_id = Math.random().toString(36).substring(2, 15);
-
-        // fire off login, then immediately start polling regardless of outcome
+        // fire off login and wait for immediate response
         fetch(api + '/login', {
             method: 'POST',
             headers: { 
                 'Content-Type': 'application/json',
                 'ngrok-skip-browser-warning': 'true'
             },
-            body: JSON.stringify({ image: b64_img, attempt_id: att_id }),
+            body: JSON.stringify({ image: b64_img }),
             credentials: 'include',
         })
-        .catch(() => {}) 
-        .finally(() => {
-            poll_status(api, att_id);
+        .then(res => res.json().catch(() => { throw new Error('SERVER ERROR'); }))
+        .then(data => {
+            if (data.success) {
+                on_success(data);
+            } else {
+                throw new Error(data.message || 'FACE NOT RECOGNIZED');
+            }
+        })
+        .catch(err => {
+            on_error(err.message || 'CONNECTION REFUSED');
         });
     });
-
-    // keeps checking if the background recognition worker finished
-    function poll_status(api, att_id) {
-        btn_text.textContent = 'ANALYZING 250 RECORDS...';
-        sts_text.textContent = 'RECOGNITION IN PROGRESS — THIS MAY TAKE 3-5 MINUTES';
-        sts_text.classList.remove('status-err');
-        sts_text.classList.add('status-ok');
-
-        let ticks = 0;
-        const iv = setInterval(() => {
-            ticks++;
-            if (ticks > 120) {
-                clearInterval(iv);
-                on_error("VERIFICATION TIMED OUT");
-                return;
-            }
-
-            fetch(`${api}/auth-status/${att_id}`, { 
-                credentials: 'include',
-                headers: { 'ngrok-skip-browser-warning': 'true' }
-            })
-            .then(res => {
-                if (res.ok) return res.json();
-            })
-            .then(dt => {
-                if (!dt) return;
-                if (dt.authenticated === true) {
-                    clearInterval(iv);
-                    on_success(dt);
-                } else if (dt.error) {
-                    clearInterval(iv);
-                    on_error(dt.error);
-                }
-            })
-            .catch(() => {});
-        }, 3000);
-    }
 
     function on_success(data) {
         btn_text.textContent = 'ACCESS GRANTED';

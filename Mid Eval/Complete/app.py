@@ -61,7 +61,18 @@ def get_db():
     finally:
         db.close()
 
+# preloaded face encodings so login comparisons are instant
+enc_cache = {}
+
 app = FastAPI()
+
+@app.on_event("startup")
+def load_encodings():
+    global enc_cache
+    print("Building facial encodings cache...")
+    mg_db = get_mg_imgs()
+    enc_cache = facial_recognition_module.build_encodings_cache(mg_db)
+
 app.mount("/Frontend", StaticFiles(directory="Frontend"), name="frontend")
 app.add_middleware(SessionMiddleware, secret_key=os.getenv("SESSION_SECRET", "super-secret-key"))
 
@@ -108,83 +119,37 @@ def get_player_data(db: Session, include_rank: bool = False):
         results.append(entry)
     return results
 
-# tracks background login jobs so the frontend can poll for results
-login_tasks = {}
-
 @app.post('/login')
-async def handle_login(req: Request):
+async def handle_login(req: Request, db: Session = Depends(get_db)):
     data = await req.json()
     b64_img = data.get('image')
-    att_id = data.get('attempt_id')
 
-    if not att_id or not b64_img:
-        return JSONResponse(status_code=400, content={"success": False, "message": "Invalid request"})
+    if not b64_img:
+        return JSONResponse(status_code=400, content={"success": False, "message": "No image provided"})
 
-    login_tasks[att_id] = {"status": "processing"}
-    
-    # kicks off the heavy recognition in background so we respond before ngrok times out 
-    asyncio.create_task(run_recognition(b64_img, att_id))
-    return {"success": True, "message": "Processing started"}
-
-async def run_recognition(b64_img, att_id):
     try:
         cln_img = b64_img.split(',')[1] if ',' in b64_img else b64_img
         
-        mg_db = await asyncio.to_thread(get_mg_imgs)
-        m_uid = await asyncio.to_thread(facial_recognition_module.find_closest_match, cln_img, mg_db)
+        m_uid = await asyncio.to_thread(facial_recognition_module.find_closest_match, cln_img, enc_cache)
         
         if not m_uid:
-            login_tasks[att_id] = {"status": "error", "message": "FACE NOT RECOGNIZED"}
-            return
+            return JSONResponse(status_code=401, content={"success": False, "message": "FACE NOT RECOGNIZED"})
 
-        with SessionLocal() as db:
-            user = db.query(User).filter(User.uid == m_uid).first()
-            if not user:
-                login_tasks[att_id] = {"status": "error", "message": "User not in MySQL"}
-                return
+        user = db.query(User).filter(User.uid == m_uid).first()
+        if not user:
+            return JSONResponse(status_code=404, content={"success": False, "message": "User not in MySQL"})
 
-            user.is_online = True
-            db.commit()
+        user.is_online = True
+        db.commit()
 
-            login_tasks[att_id] = {
-                "status": "success",
-                "uid": user.uid,
-                "name": user.name,
-                "elo_rating": user.elo_rating
-            }
+        req.session['uid'] = user.uid
+        req.session['name'] = user.name
 
-            await lobby_mgr.broadcast({"type": "presence", "uid": user.uid, "status": "online"})
+        await lobby_mgr.broadcast({"type": "presence", "uid": user.uid, "status": "online"})
+        return {"success": True, "uid": user.uid, "name": user.name, "elo_rating": user.elo_rating}
+        
     except Exception as e:
-        login_tasks[att_id] = {"status": "error", "message": str(e)}
-
-# frontend polls this with the attempt tag to see if recognition finished
-@app.get('/auth-status/{att_id}')
-async def check_auth(att_id: str, req: Request):
-    task = login_tasks.get(att_id)
-    
-    if not task:
-        return {"status": "pending"}
-
-    if task["status"] == "success":
-        # set session cookie now that we have a fast response window
-        req.session['uid'] = task["uid"]
-        req.session['name'] = task["name"]
-        
-        login_tasks.pop(att_id, None)
-        
-        return {
-            "authenticated": True, 
-            "uid": task["uid"], 
-            "name": task["name"], 
-            "elo_rating": task["elo_rating"]
-        }
-        
-    elif task["status"] == "error":
-        msg = task["message"]
-        login_tasks.pop(att_id, None)
-        return {"authenticated": False, "error": msg}
-        
-    return {"status": "processing"}
+        return JSONResponse(status_code=500, content={"success": False, "message": str(e)})
 
 @app.post('/logout')
 async def logout(req: Request, db: Session = Depends(get_db)):
@@ -247,7 +212,6 @@ def init_match(rid: str, uid: str, db: Session = Depends(get_db)):
     players = room["players"]
     opp_uid = players[0] if players[1] == uid else players[1]
 
-    my_user = db.query(User).filter(User.uid == uid).first()
     opp_user = db.query(User).filter(User.uid == opp_uid).first()
 
     def calc_wr(user_id):
@@ -479,8 +443,8 @@ async def ws_game(ws: WebSocket, rid: str, uid: str):
             other = [p for p in room["players"] if p != uid][0]
             try:
                 await finalize_match(rid, forfeit_winner=other)
-            except Exception as inner_e:
-                print(f"Finalize match crashed on disconnect: {inner_e}")
+            except Exception as e:
+                print(f"Finalize match crashed on disconnect: {e}")
 
 if __name__ == '__main__':
     uvicorn.run("app:app", host="127.0.0.1", port=5001, reload=False)
