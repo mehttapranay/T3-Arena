@@ -276,12 +276,21 @@ button {
     z-index: 0;
 }
 
-#webcam,
-#cap-frame {
+/* FIX: The Webcam mirrors the user so they can position themselves.
+   The Capture Frame does NOT mirror, showing them the true photo.
+*/
+#webcam {
     width: 100%;
     height: 100%;
     object-fit: cover;
     transform: scaleX(-1);
+}
+
+#cap-frame {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    /* Removed transform: scaleX(-1) so it shows the true image */
 }
 
 #snapshot {
@@ -295,6 +304,23 @@ button {
     background: linear-gradient(to top, var(--color-surface-dim), transparent, transparent);
 }
 
+/* =========================================
+   CAMERA CORNER ACCENTS
+   ========================================= */
+.cam-corner {
+    position: absolute;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-color: rgba(173, 198, 255, 0.5);
+    z-index: 10;
+    pointer-events: none;
+}
+
+.cam-corner.top-left { top: 1rem; left: 1rem; border-top: 2px solid; border-left: 2px solid; border-top-left-radius: 4px; }
+.cam-corner.top-right { top: 1rem; right: 1rem; border-top: 2px solid; border-right: 2px solid; border-top-right-radius: 4px; }
+.cam-corner.bottom-left { bottom: 1rem; left: 1rem; border-bottom: 2px solid; border-left: 2px solid; border-bottom-left-radius: 4px; }
+.cam-corner.bottom-right { bottom: 1rem; right: 1rem; border-bottom: 2px solid; border-right: 2px solid; border-bottom-right-radius: 4px; }
+
 /* Controls section */
 #controls {
     margin-top: 3rem;
@@ -302,13 +328,14 @@ button {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 2rem;
+    gap: 1.5rem;
 }
 
 #status-ind {
     display: flex;
     align-items: center;
     gap: 0.75rem;
+    margin-bottom: 0.5rem;
 }
 
 .static-dot {
@@ -327,7 +354,31 @@ button {
     text-transform: uppercase;
 }
 
-/* Scan button */
+/* Shared Button Interiors */
+.scan-btn-inner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    position: relative;
+    z-index: 2;
+}
+
+.scan-btn-icn {
+    font-size: 1.5rem;
+}
+
+#btn-text, .reg-btn-text {
+    font-family: var(--font-header);
+    font-weight: 900;
+    font-size: 1.25rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+/* =========================================
+   SCAN IDENTITY BUTTON (PULSE GLOW EFFECT)
+   ========================================= */
 #scan-btn {
     position: relative;
     overflow: hidden;
@@ -336,48 +387,120 @@ button {
     justify-content: center;
     align-items: center;
     padding: 1.25rem 3rem;
-    border-radius: 0.5rem;
+    border-radius: 0.5rem; 
+    
     background: linear-gradient(135deg, var(--color-primary), var(--color-primary-container));
-    transition: transform 0.2s ease;
+    animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    transition: transform 0.3s ease;
+}
+
+#scan-btn #btn-text, #scan-btn .scan-btn-icn {
+    color: var(--color-on-pri-fixed);
+}
+
+#scan-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(255, 255, 255, 0.2);
+    transform: skewX(-20deg);
+    transition: left 1s ease;
+    z-index: 1;
 }
 
 #scan-btn:hover:not(:disabled) {
-    transform: scale(1.05);
+    transform: scale(1.02);
+}
+
+#scan-btn:hover:not(:disabled)::before {
+    left: 100%;
 }
 
 #scan-btn:active:not(:disabled) {
-    transform: scale(0.98);
+    transform: scale(0.95);
 }
 
 #scan-btn:disabled {
     cursor: not-allowed;
     opacity: 0.75;
+    animation: none; 
+    box-shadow: none;
 }
 
-.scan-btn-inner {
+@keyframes pulse-ring {
+    0% { box-shadow: 0 0 30px rgba(173, 198, 255, 0.2), 0 0 0 0 rgba(173, 198, 255, 0.4); }
+    70% { box-shadow: 0 0 30px rgba(173, 198, 255, 0.2), 0 0 0 20px rgba(173, 198, 255, 0); }
+    100% { box-shadow: 0 0 30px rgba(173, 198, 255, 0.2), 0 0 0 0 rgba(173, 198, 255, 0); }
+}
+
+
+/* =========================================
+   REGISTER BUTTON (PRO SCI-FI STYLE)
+   ========================================= */
+.reg-btn {
+    position: relative;
+    overflow: hidden;
+    width: 100%;
     display: flex;
-    align-items: center;
     justify-content: center;
-    gap: 1rem;
+    align-items: center;
+    padding: 1.25rem 3rem;
+    border-radius: 0.15rem; 
+    
+    background: linear-gradient(90deg, rgba(173, 198, 255, 0.08) 0%, transparent 100%);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    
+    border: 1px solid rgba(173, 198, 255, 0.05);
+    border-left: 3px solid rgba(173, 198, 255, 0.4); 
+    
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
 }
 
-.scan-btn-icn {
-    color: var(--color-on-pri-fixed);
-    font-size: 1.5rem;
+.reg-btn .reg-btn-text, .reg-btn .scan-btn-icn {
+    color: rgba(173, 198, 255, 0.8);
+    transition: color 0.3s ease;
 }
 
-#btn-text {
-    font-family: var(--font-header);
-    font-weight: 900;
-    font-size: 1.25rem;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--color-on-pri-fixed);
+.reg-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -150%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(173, 198, 255, 0.15), transparent);
+    transform: skewX(-20deg);
+    transition: left 0.5s ease-in-out;
+}
+
+.reg-btn:hover {
+    background: linear-gradient(90deg, rgba(173, 198, 255, 0.15) 0%, rgba(173, 198, 255, 0.02) 100%);
+    border-color: rgba(173, 198, 255, 0.2);
+    border-left: 3px solid var(--color-primary);
+    box-shadow: 0 10px 20px -10px rgba(173, 198, 255, 0.2);
+}
+
+.reg-btn:hover::before {
+    left: 150%;
+}
+
+.reg-btn:hover .reg-btn-text, .reg-btn:hover .scan-btn-icn {
+    color: #ffffff; 
+}
+
+.reg-btn:active {
+    transform: scale(0.99); 
+    border-left-width: 5px; 
 }
 
 /* Auth badge */
 #auth-badge-wrap {
-    margin-top: 1rem;
+    margin-top: 1.5rem;
     display: flex;
     justify-content: center;
     width: 100%;
@@ -448,6 +571,273 @@ button {
 
 .status-err {
     color: var(--color-error) !important;
+}
+
+/* =========================================
+   MODAL OVERLAY & POPUPS
+   ========================================= */
+#modal-overlay {
+    position: fixed;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 9999;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 1rem;
+}
+
+.custom-modal {
+    width: 100%;
+    max-width: 420px;
+    background-color: var(--color-surface-lowest);
+    border: 1px solid rgba(173, 198, 255, 0.15);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.05);
+    border-radius: 0.5rem;
+    overflow: hidden;
+    position: relative;
+    animation: modalPop 0.3s ease-out;
+}
+
+@keyframes modalPop {
+    0% { transform: scale(0.95) translateY(10px); opacity: 0; }
+    100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+/* ❌ CLOSE BUTTON */
+.modal-close-btn {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background: transparent;
+    border: none;
+    color: rgba(173, 198, 255, 0.5);
+    cursor: pointer;
+    transition: color 0.2s, transform 0.2s;
+    z-index: 10;
+}
+.modal-close-btn:hover {
+    color: var(--color-error);
+    transform: scale(1.1);
+}
+
+/* Modal 1: Error Layout */
+.modal-header-center {
+    text-align: center;
+    padding: 2rem 1.5rem 1.5rem;
+}
+
+.modal-header-center h2 {
+    font-size: 2rem;
+    font-weight: 900;
+    color: var(--color-primary);
+    letter-spacing: 0.1em;
+}
+
+.modal-err-sub {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    color: var(--color-error);
+    font-size: 0.75rem;
+    margin-top: 0.5rem;
+}
+
+.modal-face-box {
+    position: relative;
+    width: calc(100% - 3rem);
+    height: 140px;
+    margin: 0 auto 1.5rem;
+    background-color: var(--color-surface-dim);
+    border: 1px solid rgba(173, 198, 255, 0.1);
+    border-radius: 0.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.modal-face-box .face-icn {
+    font-size: 4rem;
+    color: rgba(173, 198, 255, 0.3);
+}
+
+.scan-line-err {
+    position: absolute;
+    top: 50%;
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--color-primary), transparent);
+    box-shadow: 0 0 10px var(--color-primary);
+    opacity: 0.5;
+    animation: scanError 2s linear infinite;
+}
+
+@keyframes scanError {
+    0% { top: 0%; opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { top: 100%; opacity: 0; }
+}
+
+.modal-actions-col {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0 1.5rem 2rem;
+}
+
+/* Modal 2 & 3: Layouts */
+.modal-side-accent {
+    position: absolute;
+    left: 0;
+    top: 1.5rem;
+    bottom: 1.5rem;
+    width: 3px;
+    background-color: var(--color-primary);
+    border-top-right-radius: 3px;
+    border-bottom-right-radius: 3px;
+}
+
+.modal-content-wrap {
+    padding: 2rem;
+}
+
+.modal-header-left {
+    margin-bottom: 2rem;
+}
+
+.modal-header-left h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--color-on-surface);
+    margin-bottom: 0.5rem;
+}
+
+.modal-header-left p {
+    font-size: 0.875rem;
+    color: var(--color-on-surface-var);
+    opacity: 0.8;
+}
+
+.modal-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.input-group label {
+    display: block;
+    font-size: 0.65rem;
+    color: var(--color-on-surface-var);
+    letter-spacing: 0.1em;
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+}
+
+.input-wrapper {
+    display: flex;
+    align-items: center;
+    background-color: #1a1a1a;
+    border-radius: 0.25rem;
+    border: 1px solid rgba(173, 198, 255, 0.1);
+    padding: 0.75rem 1rem;
+    gap: 0.75rem;
+    transition: border-color 0.2s;
+}
+
+.input-wrapper:focus-within {
+    border-color: var(--color-primary);
+}
+
+.input-wrapper .material-symbols-outlined {
+    font-size: 1.25rem;
+    color: rgba(173, 198, 255, 0.5);
+}
+
+.input-wrapper input {
+    width: 100%;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--color-on-surface);
+    font-size: 0.875rem;
+}
+
+/* Modal Buttons */
+.modal-btn-primary, .modal-btn-secondary, .modal-btn-init {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 1rem;
+    border-radius: 0.25rem;
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: 0.875rem;
+    transition: all 0.2s;
+}
+
+.modal-btn-primary {
+    background: linear-gradient(135deg, var(--color-primary), var(--color-primary-container));
+    color: var(--color-on-pri-fixed);
+}
+
+.modal-btn-primary:hover {
+    filter: brightness(1.1);
+}
+
+.modal-btn-secondary {
+    background: transparent;
+    border: 1px solid rgba(173, 198, 255, 0.2);
+    color: var(--color-primary);
+}
+
+.modal-btn-secondary:hover {
+    background: rgba(173, 198, 255, 0.05);
+    border-color: rgba(173, 198, 255, 0.5);
+}
+
+.modal-btn-init {
+    background: linear-gradient(135deg, var(--color-primary), var(--color-primary-container));
+    color: var(--color-on-pri-fixed);
+    margin-top: 2rem;
+}
+
+.modal-btn-init:hover {
+    filter: brightness(1.1);
+}
+
+/* =========================================
+   PASSWORD ERROR STATE
+   ========================================= */
+.input-wrapper.input-error {
+    border-color: var(--color-error) !important;
+    animation: shake 0.4s ease-in-out;
+}
+
+.input-wrapper.input-error .material-symbols-outlined {
+    color: var(--color-error);
+}
+
+.pwd-error-text {
+    font-family: var(--font-header);
+    font-size: 0.65rem;
+    color: var(--color-error);
+    margin-top: -0.5rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    text-align: center;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-5px); }
+    40%, 80% { transform: translateX(5px); }
 }
 
 /* Responsive */

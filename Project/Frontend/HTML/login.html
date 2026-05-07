@@ -54,6 +54,11 @@
                     <canvas id="snapshot" class="hidden"></canvas>
                     <img id="cap-frame" class="hidden" alt="Captured biometric frame"/>
                     <div class="gradient-fade" aria-hidden="true"></div>
+                    
+                    <div class="cam-corner top-left"></div>
+                    <div class="cam-corner top-right"></div>
+                    <div class="cam-corner bottom-left"></div>
+                    <div class="cam-corner bottom-right"></div>
                 </div>
             </div>
 
@@ -68,6 +73,13 @@
                     <div class="scan-btn-inner">
                         <span class="material-symbols-outlined scan-btn-icn">fingerprint</span>
                         <span id="btn-text">SCAN IDENTITY</span>
+                    </div>
+                </button>
+
+                <button id="reg-btn" class="reg-btn">
+                    <div class="scan-btn-inner">
+                        <span class="material-symbols-outlined scan-btn-icn">person_add</span>
+                        <span class="reg-btn-text">REGISTER IDENTITY</span>
                     </div>
                 </button>
 
@@ -89,6 +101,107 @@
     <div class="side-lbl side-lbl-right" aria-hidden="true">
         <span class="side-text">ENCRYPTED DATA STREAM ACTIVE</span>
         <div class="side-line"></div>
+    </div>
+
+    <div id="modal-overlay" class="hidden">
+        
+        <div id="modal-error" class="custom-modal hidden">
+            <button class="modal-close-btn js-close-modal">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+
+            <div class="modal-header-center">
+                <h2 class="font-header">ARENA_OS</h2>
+                <div class="modal-err-sub">
+                    <span class="material-symbols-outlined">warning</span>
+                    <span class="font-mono" id="biometric-err-msg">ERR_BIOMETRIC_MISMATCH</span>
+                </div>
+            </div>
+            
+            <div class="modal-face-box">
+                <span class="material-symbols-outlined face-icn">face</span>
+                <div class="scan-line-err"></div>
+                <div class="cam-corner top-left"></div>
+                <div class="cam-corner top-right"></div>
+                <div class="cam-corner bottom-left"></div>
+                <div class="cam-corner bottom-right"></div>
+            </div>
+
+            <div class="modal-actions-col">
+                <button id="btn-retry-scan" class="modal-btn-primary">
+                    <span class="material-symbols-outlined">restart_alt</span> RETRY FACIAL SCAN
+                </button>
+                <button id="btn-enter-pwd" class="modal-btn-secondary">
+                    <span class="material-symbols-outlined">password</span> ENTER PASSWORD
+                </button>
+            </div>
+        </div>
+
+        <div id="modal-password" class="custom-modal hidden">
+            <button class="modal-close-btn js-close-modal">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+
+            <div class="modal-side-accent"></div>
+            <div class="modal-content-wrap">
+                <div class="modal-header-left">
+                    <h2 class="font-header">Manual Override</h2>
+                    <p class="font-body">Biometric failure detected. Please enter fallback credentials.</p>
+                </div>
+
+                <div class="modal-form">
+                    <div class="input-group">
+                        <label class="font-header">OPERATOR ID</label>
+                        <div class="input-wrapper">
+                            <span class="material-symbols-outlined">badge</span>
+                            <input type="text" placeholder="OP-XXXX" id="op-id-input" class="font-mono">
+                        </div>
+                    </div>
+                    
+                    <div class="input-group">
+                        <label class="font-header">PASSCODE</label>
+                        <div class="input-wrapper">
+                            <span class="material-symbols-outlined">lock</span>
+                            <input type="password" placeholder="••••••••" id="op-pwd-input" class="font-mono">
+                        </div>
+                    </div>
+                    
+                    <div id="pwd-err-msg" class="pwd-error-text hidden"></div>
+                </div>
+
+                <button id="btn-pwd-login" class="modal-btn-init">
+                    <span class="material-symbols-outlined">login</span> INITIALIZE
+                </button>
+            </div>
+        </div>
+
+        <div id="modal-update-bio" class="custom-modal hidden">
+            <button class="modal-close-btn js-close-modal">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+
+            <div class="modal-content-wrap" style="text-align: center; padding-top: 3rem;">
+                <span class="material-symbols-outlined" style="font-size: 4.5rem; color: var(--color-primary); margin-bottom: 1rem;">account_circle</span>
+                
+                <h2 class="font-header" style="font-size: 1.5rem; color: var(--color-on-surface); margin-bottom: 0.5rem; letter-spacing: 0.05em;">
+                    BIOMETRIC UPDATE RECOMMENDED
+                </h2>
+                
+                <p class="font-body" style="font-size: 0.875rem; color: var(--color-on-surface-var); margin-bottom: 2.5rem; opacity: 0.8; padding: 0 1rem; line-height: 1.5;">
+                    Manual override successful. However, your facial signature is currently missing or outdated due to automated server memory optimization.
+                </p>
+                
+                <div class="modal-actions-col" style="padding: 0;">
+                    <button id="btn-update-bio" class="modal-btn-primary">
+                        <span class="material-symbols-outlined">face_retouching_natural</span> UPDATE BIOMETRICS
+                    </button>
+                    <button id="btn-skip-bio" class="modal-btn-secondary">
+                        <span class="material-symbols-outlined">terminal</span> PROCEED TO LOBBY
+                    </button>
+                </div>
+            </div>
+        </div>
+
     </div>
 
 </body>
